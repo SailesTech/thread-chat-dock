@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SuggestionChips } from "@/components/SuggestionChips";
 
 interface Message {
   id: string;
@@ -156,10 +155,7 @@ export function ChatArea() {
 
       {/* Input Area */}
       <div className="border-t bg-white/80 backdrop-blur-sm p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
-          {/* Suggestion Chips */}
-          <SuggestionChips onChipClick={(text) => setInputValue(text)} />
-          
+        <div className="max-w-4xl mx-auto">
           {/* Input Field */}
           <div className="flex gap-3 items-end">
             <div className="flex-1 relative">
