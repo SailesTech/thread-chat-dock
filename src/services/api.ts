@@ -1,4 +1,3 @@
-
 // API Service for Notion and Chat integration
 // TODO: Replace with actual API endpoints
 
@@ -11,6 +10,7 @@ interface NotionDatabase {
 interface NotionPage {
   id: string;
   title: string;
+  name: string;
   database_id: string;
 }
 
@@ -38,7 +38,7 @@ interface ChatThread {
 }
 
 class APIService {
-  private baseURL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+  private baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
   
   // Notion API Methods
   async getNotionDatabases(): Promise<NotionDatabase[]> {
@@ -67,8 +67,8 @@ class APIService {
       
       console.log(`Fetching pages for database ${databaseId}...`);
       return [
-        { id: "p1", title: "Strona główna", database_id: databaseId },
-        { id: "p2", title: "Katalog produktów", database_id: databaseId },
+        { id: "p1", title: "Strona główna", name: "Strona główna", database_id: databaseId },
+        { id: "p2", title: "Katalog produktów", name: "Katalog produktów", database_id: databaseId },
       ];
     } catch (error) {
       console.error("Error fetching Notion pages:", error);
