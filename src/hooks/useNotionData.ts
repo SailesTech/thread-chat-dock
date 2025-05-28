@@ -7,25 +7,25 @@ export function useNotionDatabases() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDatabases = async () => {
-      try {
-        setLoading(true);
-        const data = await apiService.getNotionDatabases();
-        setDatabases(data);
-        setError(null);
-      } catch (err) {
-        setError('Failed to fetch databases');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchDatabases = async () => {
+    try {
+      setLoading(true);
+      const data = await apiService.getNotionDatabases();
+      setDatabases(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to fetch databases');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDatabases();
   }, []);
 
-  return { databases, loading, error, refetch: () => fetchDatabases() };
+  return { databases, loading, error, refetch: fetchDatabases };
 }
 
 export function useNotionPages(databaseId: string | null) {

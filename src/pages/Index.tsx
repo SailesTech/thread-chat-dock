@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 
 const Index = () => {
   return (
-    <SidebarProvider defaultOpen={true} collapsedWidth={56}>
+    <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
         <AppSidebar />
         <div className="flex-1 flex flex-col">

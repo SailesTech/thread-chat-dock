@@ -1,13 +1,11 @@
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, MoreHorizontal } from "lucide-react";
+import { Send, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SuggestionChips } from "@/components/SuggestionChips";
-import { CTAButtons } from "@/components/CTAButtons";
 
 interface Message {
   id: string;
@@ -159,9 +157,6 @@ export function ChatArea() {
       {/* Input Area */}
       <div className="border-t bg-white/80 backdrop-blur-sm p-4">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* CTA Buttons */}
-          <CTAButtons />
-          
           {/* Suggestion Chips */}
           <SuggestionChips onChipClick={(text) => setInputValue(text)} />
           
