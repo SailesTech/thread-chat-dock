@@ -1,10 +1,14 @@
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip } from "lucide-react";
+import { Send, Paperclip, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useNotionAttributes } from "@/hooks/useNotionData";
 
 interface Message {
   id: string;
@@ -40,7 +44,16 @@ export function ChatArea() {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [attributeSearch, setAttributeSearch] = useState("");
+  const [selectedDatabase] = useState<string>(""); // This would come from context/props in real app
+  const [isAttributePopoverOpen, setIsAttributePopoverOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const { attributes, loading: attributesLoading } = useNotionAttributes(selectedDatabase || null);
+
+  const filteredAttributes = attributes.filter(attr =>
+    attr.name.toLowerCase().includes(attributeSearch.toLowerCase())
+  );
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -89,6 +102,12 @@ export function ChatArea() {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleAttributeSelect = (attributeName: string) => {
+    setInputValue(prev => prev + ` ${attributeName}`);
+    setAttributeSearch("");
+    setIsAttributePopoverOpen(false);
   };
 
   return (
@@ -153,34 +172,84 @@ export function ChatArea() {
         </div>
       </ScrollArea>
 
-      {/* Input Area */}
-      <div className="border-t bg-white/80 backdrop-blur-sm p-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Input Field */}
-          <div className="flex gap-3 items-end">
+      {/* Input Area - Enlarged */}
+      <div className="border-t bg-white/80 backdrop-blur-sm p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Input Field with integrated attribute search */}
+          <div className="flex gap-4 items-end">
             <div className="flex-1 relative">
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Wpisz swoje pytanie o dane z Notion..."
-                className="min-h-[60px] max-h-32 resize-none pr-12 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                className="min-h-[120px] max-h-48 resize-none pr-24 text-lg bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                 disabled={isLoading}
               />
+              
+              {/* Attribute Search Popover */}
+              <Popover open={isAttributePopoverOpen} onOpenChange={setIsAttributePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-12 bottom-3 h-10 w-10 p-0 text-slate-400 hover:text-slate-600"
+                    title="Wyszukaj atrybuty"
+                  >
+                    <Search className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end" side="top">
+                  <div className="p-3 border-b">
+                    <Input
+                      placeholder="Szukaj atrybutów..."
+                      value={attributeSearch}
+                      onChange={(e) => setAttributeSearch(e.target.value)}
+                      className="bg-white border-slate-200"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {attributesLoading ? (
+                      <div className="p-3 text-sm text-slate-500">Ładowanie atrybutów...</div>
+                    ) : filteredAttributes.length > 0 ? (
+                      <div className="p-2">
+                        {filteredAttributes.map((attr) => (
+                          <button
+                            key={attr.id}
+                            onClick={() => handleAttributeSelect(attr.name)}
+                            className="w-full flex items-center justify-between p-2 hover:bg-slate-50 rounded text-left"
+                          >
+                            <span className="text-sm font-medium">{attr.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {attr.type}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 text-sm text-slate-500">
+                        {selectedDatabase ? "Brak atrybutów" : "Wybierz bazę danych w sidebarze"}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-2 bottom-2 h-8 w-8 p-0 text-slate-400 hover:text-slate-600"
+                className="absolute right-2 bottom-3 h-10 w-10 p-0 text-slate-400 hover:text-slate-600"
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className="h-5 w-5" />
               </Button>
             </div>
             <Button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
-              className="h-12 w-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl"
+              className="h-16 w-16 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl"
             >
-              <Send className="h-5 w-5" />
+              <Send className="h-6 w-6" />
             </Button>
           </div>
         </div>
