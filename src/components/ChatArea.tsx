@@ -9,39 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNotionAttributes } from "@/hooks/useNotionData";
-
-interface Message {
-  id: string;
-  content: string;
-  sender: "user" | "bot";
-  timestamp: string;
-  threadId?: string;
-  isCollapsed?: boolean;
-}
-
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    content: "Cześć! Jak mogę Ci pomóc z analizą danych z Notion?",
-    sender: "bot",
-    timestamp: "10:00",
-  },
-  {
-    id: "2",
-    content: "Pokaż mi produkty z kategorii elektronika, które mają cenę powyżej 1000 zł",
-    sender: "user",
-    timestamp: "10:01",
-  },
-  {
-    id: "3",
-    content: "Znalazłem 15 produktów elektronicznych powyżej 1000 zł. Oto szczegóły:\n\n• iPhone 15 Pro - 4999 zł\n• MacBook Air M2 - 4899 zł\n• iPad Pro 12.9 - 4799 zł\n• Samsung Galaxy S24 - 3999 zł\n• Dell XPS 13 - 3499 zł\n\nCzy chcesz zobaczyć więcej szczegółów dla któregoś z produktów?",
-    sender: "bot",
-    timestamp: "10:02",
-  },
-];
+import { useSupabaseChatMessages } from "@/hooks/useSupabaseChatData";
+import { useChatContext } from "@/contexts/ChatContext";
 
 export function ChatArea() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [attributeSearch, setAttributeSearch] = useState("");
@@ -49,6 +20,8 @@ export function ChatArea() {
   const [isAttributePopoverOpen, setIsAttributePopoverOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const { currentThreadId } = useChatContext();
+  const { messages, sendMessage } = useSupabaseChatMessages(currentThreadId);
   const { attributes, loading: attributesLoading } = useNotionAttributes(selectedDatabase || null);
 
   const filteredAttributes = attributes.filter(attr =>
@@ -62,39 +35,33 @@ export function ChatArea() {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !currentThreadId) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      sender: "user",
-      timestamp: new Date().toLocaleTimeString("pl-PL", { 
-        hour: "2-digit", 
-        minute: "2-digit" 
-      }),
-    };
-
-    setMessages(prev => [...prev, newMessage]);
+    const messageContent = inputValue;
     setInputValue("");
     setIsLoading(true);
 
-    // Placeholder for API call to chat service
-    console.log("Sending message to chat API:", newMessage.content);
-    
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "Pracuję nad Twoim zapytaniem... (Tutaj będzie odpowiedź z API)",
-        sender: "bot",
-        timestamp: new Date().toLocaleTimeString("pl-PL", { 
-          hour: "2-digit", 
-          minute: "2-digit" 
-        }),
-      };
-      setMessages(prev => [...prev, botResponse]);
+    try {
+      // Send user message
+      await sendMessage(messageContent, 'user');
+
+      // Simulate bot response (in a real app, this would be an API call)
+      setTimeout(async () => {
+        try {
+          await sendMessage(
+            "Pracuję nad Twoim zapytaniem... (Tutaj będzie odpowiedź z API)", 
+            'bot'
+          );
+        } catch (error) {
+          console.error('Failed to send bot message:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to send message:', error);
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -109,6 +76,21 @@ export function ChatArea() {
     setAttributeSearch("");
     setIsAttributePopoverOpen(false);
   };
+
+  if (!currentThreadId) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gradient-to-b from-white to-slate-50">
+        <div className="text-center p-8">
+          <h2 className="text-2xl font-semibold text-slate-700 mb-4">
+            Wybierz wątek aby rozpocząć rozmowę
+          </h2>
+          <p className="text-slate-500">
+            Utwórz nowy wątek lub wybierz istniejący z listy po lewej stronie
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-white to-slate-50">
@@ -143,7 +125,10 @@ export function ChatArea() {
                     message.sender === "user" ? "text-blue-100" : "text-slate-500"
                   }`}
                 >
-                  {message.timestamp}
+                  {new Date(message.created_at).toLocaleTimeString("pl-PL", { 
+                    hour: "2-digit", 
+                    minute: "2-digit" 
+                  })}
                 </div>
               </div>
 
@@ -172,10 +157,9 @@ export function ChatArea() {
         </div>
       </ScrollArea>
 
-      {/* Input Area - Enlarged */}
+      {/* Input Area */}
       <div className="border-t bg-white/80 backdrop-blur-sm p-6">
         <div className="max-w-6xl mx-auto">
-          {/* Input Field with integrated attribute search */}
           <div className="flex gap-4 items-end">
             <div className="flex-1 relative">
               <Textarea
@@ -246,7 +230,7 @@ export function ChatArea() {
             </div>
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={!inputValue.trim() || isLoading || !currentThreadId}
               className="h-16 w-16 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl"
             >
               <Send className="h-6 w-6" />
