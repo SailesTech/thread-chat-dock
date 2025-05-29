@@ -164,7 +164,14 @@ export function useSupabaseChatMessages(threadId: string | null) {
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        setMessages(data || []);
+        
+        // Ensure sender field matches our type definition
+        const typedMessages: ChatMessage[] = (data || []).map(msg => ({
+          ...msg,
+          sender: msg.sender as 'user' | 'bot'
+        }));
+        
+        setMessages(typedMessages);
         setError(null);
       } catch (err) {
         const errorMessage = 'Failed to fetch messages';
@@ -194,7 +201,11 @@ export function useSupabaseChatMessages(threadId: string | null) {
           filter: `thread_id=eq.${threadId}`
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage]);
+          const newMessage = {
+            ...payload.new,
+            sender: payload.new.sender as 'user' | 'bot'
+          } as ChatMessage;
+          setMessages(prev => [...prev, newMessage]);
         }
       )
       .subscribe();
