@@ -67,15 +67,40 @@ Deno.serve(async (req) => {
     }
 
     const responseText = await response.text();
-    console.log('n8n response received');
+    console.log('n8n response received, content:', responseText);
 
     // Parsuj odpowiedź z n8n
     let aiResponse;
     try {
-      aiResponse = JSON.parse(responseText);
+      const parsed = JSON.parse(responseText);
+      console.log('n8n parsed response:', parsed);
+      
+      // n8n zwraca array z obiektem [{output: "..."}]
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].output) {
+        aiResponse = { 
+          response: parsed[0].output, 
+          success: true 
+        };
+      }
+      // Inne możliwe formaty
+      else if (parsed.response) {
+        aiResponse = parsed;
+      } else if (parsed.message) {
+        aiResponse = { response: parsed.message, success: true };
+      } else if (parsed.text) {
+        aiResponse = { response: parsed.text, success: true };
+      } else if (typeof parsed === 'string') {
+        aiResponse = { response: parsed, success: true };
+      } else {
+        // Fallback - użyj całej odpowiedzi jako tekst
+        aiResponse = { response: JSON.stringify(parsed), success: true };
+      }
     } catch (e) {
+      console.log('n8n response is not JSON, treating as text');
       aiResponse = { response: responseText, success: true };
     }
+    
+    console.log('Final response to send:', aiResponse);
 
     return new Response(JSON.stringify(aiResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
