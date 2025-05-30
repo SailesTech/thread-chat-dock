@@ -75,8 +75,15 @@ Deno.serve(async (req) => {
       const parsed = JSON.parse(responseText);
       console.log('n8n parsed response:', parsed);
       
+      // n8n zwraca {output: "tekst"} - weź tylko tekst
+      if (parsed.output) {
+        aiResponse = { 
+          response: parsed.output,  // Tylko sam tekst
+          success: true 
+        };
+      }
       // n8n zwraca array z obiektem [{output: "..."}]
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].output) {
+      else if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].output) {
         aiResponse = { 
           response: parsed[0].output, 
           success: true 
