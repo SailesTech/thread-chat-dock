@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useSupabaseChatMessages } from "@/hooks/useSupabaseChatData";
@@ -18,7 +17,6 @@ export function ChatArea() {
     if (!currentThreadId) return;
 
     setIsLoading(true);
-
     try {
       // Send user message
       await sendMessage(messageContent, 'user');
@@ -39,6 +37,17 @@ export function ChatArea() {
       );
 
       console.log('AI response received:', aiResponse);
+
+      // ✅ DODAJ TĘ LINIĘ - wyślij odpowiedź AI do chatu
+      if (aiResponse && aiResponse.response) {
+        await sendMessage(aiResponse.response, 'bot');
+      } else if (aiResponse && aiResponse.content) {
+        // Na wypadek gdyby odpowiedź była w polu 'content' zamiast 'response'
+        await sendMessage(aiResponse.content, 'bot');
+      } else {
+        throw new Error('No valid response from AI');
+      }
+
     } catch (error) {
       console.error('Failed to send message:', error);
       // Send fallback message
