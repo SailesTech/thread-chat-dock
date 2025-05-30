@@ -1,5 +1,6 @@
+
 // API Service for Notion and Chat integration
-// TODO: Replace with actual API endpoints
+import { supabase } from '@/integrations/supabase/client';
 
 interface NotionDatabase {
   id: string;
@@ -38,21 +39,19 @@ interface ChatThread {
 }
 
 class APIService {
-  private baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
   
   // Notion API Methods
   async getNotionDatabases(): Promise<NotionDatabase[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/notion/databases`);
-      // return await response.json();
-      
       console.log("Fetching Notion databases...");
-      return [
-        { id: "db1", name: "Produkty", available: true },
-        { id: "db2", name: "Klienci", available: true },
-        { id: "db3", name: "Zamówienia", available: false },
-      ];
+      
+      const { data, error } = await supabase.functions.invoke('notion-integration', {
+        method: 'GET',
+        body: new URLSearchParams({ action: 'databases' })
+      });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error fetching Notion databases:", error);
       throw error;
@@ -61,15 +60,18 @@ class APIService {
 
   async getNotionPages(databaseId: string): Promise<NotionPage[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/notion/databases/${databaseId}/pages`);
-      // return await response.json();
-      
       console.log(`Fetching pages for database ${databaseId}...`);
-      return [
-        { id: "p1", title: "Strona główna", name: "Strona główna", database_id: databaseId },
-        { id: "p2", title: "Katalog produktów", name: "Katalog produktów", database_id: databaseId },
-      ];
+      
+      const { data, error } = await supabase.functions.invoke('notion-integration', {
+        method: 'GET',
+        body: new URLSearchParams({ 
+          action: 'pages',
+          database_id: databaseId 
+        })
+      });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error fetching Notion pages:", error);
       throw error;
@@ -78,16 +80,18 @@ class APIService {
 
   async getNotionAttributes(databaseId: string): Promise<NotionAttribute[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/notion/databases/${databaseId}/attributes`);
-      // return await response.json();
-      
       console.log(`Fetching attributes for database ${databaseId}...`);
-      return [
-        { id: "a1", name: "Nazwa", type: "text", database_id: databaseId },
-        { id: "a2", name: "Cena", type: "number", database_id: databaseId },
-        { id: "a3", name: "Kategoria", type: "select", database_id: databaseId },
-      ];
+      
+      const { data, error } = await supabase.functions.invoke('notion-integration', {
+        method: 'GET',
+        body: new URLSearchParams({ 
+          action: 'attributes',
+          database_id: databaseId 
+        })
+      });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error fetching Notion attributes:", error);
       throw error;
@@ -96,16 +100,19 @@ class APIService {
 
   async queryNotionData(query: string, filters?: any): Promise<any[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/notion/query`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ query, filters })
-      // });
-      // return await response.json();
-      
       console.log(`Querying Notion data with: ${query}`, filters);
-      return [];
+      
+      const { data, error } = await supabase.functions.invoke('notion-integration', {
+        method: 'GET',
+        body: new URLSearchParams({ 
+          action: 'query',
+          query: query,
+          filters: filters ? JSON.stringify(filters) : ''
+        })
+      });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error querying Notion data:", error);
       throw error;
@@ -113,21 +120,27 @@ class APIService {
   }
 
   // Chat API Methods
-  async sendChatMessage(message: string, threadId?: string): Promise<ChatMessage> {
+  async sendChatMessage(message: string, threadId?: string, notionContext?: any): Promise<ChatMessage> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/chat/messages`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ message, thread_id: threadId })
-      // });
-      // return await response.json();
-      
       console.log(`Sending chat message: ${message}`, threadId ? `to thread ${threadId}` : 'to new thread');
       
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { 
+          message, 
+          threadId,
+          notionContext 
+        }
+      });
+
+      if (error) throw error;
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get AI response');
+      }
+
       return {
         id: Date.now().toString(),
-        content: "Bot response placeholder - integrate with actual chat API",
+        content: data.response,
         sender: "bot",
         timestamp: new Date().toISOString(),
         thread_id: threadId,
@@ -140,20 +153,9 @@ class APIService {
 
   async getChatThreads(): Promise<ChatThread[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/chat/threads`);
-      // return await response.json();
-      
       console.log("Fetching chat threads...");
-      return [
-        {
-          id: "t1",
-          title: "Analiza produktów Q4",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          message_count: 5,
-        }
-      ];
+      // This is handled by the Supabase hooks directly
+      return [];
     } catch (error) {
       console.error("Error fetching chat threads:", error);
       throw error;
@@ -162,16 +164,8 @@ class APIService {
 
   async createChatThread(title: string): Promise<ChatThread> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/chat/threads`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ title })
-      // });
-      // return await response.json();
-      
       console.log(`Creating new chat thread: ${title}`);
-      
+      // This is handled by the Supabase hooks directly
       return {
         id: Date.now().toString(),
         title,
@@ -187,11 +181,8 @@ class APIService {
 
   async getChatMessages(threadId: string): Promise<ChatMessage[]> {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${this.baseURL}/chat/threads/${threadId}/messages`);
-      // return await response.json();
-      
       console.log(`Fetching messages for thread ${threadId}...`);
+      // This is handled by the Supabase hooks directly
       return [];
     } catch (error) {
       console.error("Error fetching chat messages:", error);
