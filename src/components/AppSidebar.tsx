@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Database, FileText, Filter, MessageCircle, Search, AlertCircle } from "lucide-react";
 import {
@@ -22,12 +21,22 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ThreadsList } from "@/components/ThreadsList";
 import { useNotionDatabases, useNotionPages, useNotionAttributes } from "@/hooks/useNotionData";
+import { useNotionSelection } from "@/contexts/NotionSelectionContext"; // ✅ Dodaj import
 
 export function AppSidebar() {
   const { state } = useSidebar();
-  const [selectedDatabase, setSelectedDatabase] = useState<string>("");
-  const [selectedPage, setSelectedPage] = useState<string>("");
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+  
+  // ✅ Użyj shared context zamiast lokalnego state
+  const {
+    selectedDatabase,
+    selectedPage,
+    selectedAttributes,
+    setSelectedDatabase,
+    setSelectedPage,
+    setSelectedAttributes,
+  } = useNotionSelection();
+
+  // Lokalne state tylko dla search/filter
   const [databaseSearch, setDatabaseSearch] = useState("");
   const [pageSearch, setPageSearch] = useState("");
   const [attributeSearch, setAttributeSearch] = useState("");
@@ -49,10 +58,10 @@ export function AppSidebar() {
   );
 
   const handleAttributeChange = (attributeId: string, checked: boolean) => {
-    setSelectedAttributes(prev => 
+    setSelectedAttributes(
       checked 
-        ? [...prev, attributeId]
-        : prev.filter(id => id !== attributeId)
+        ? [...selectedAttributes, attributeId]
+        : selectedAttributes.filter(id => id !== attributeId)
     );
   };
 
