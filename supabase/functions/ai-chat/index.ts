@@ -1,3 +1,5 @@
+const WEBHOOK_URL = 'https://n8n-production-2e02.up.railway.app/webhook/3389e498-f059-447c-a1a8-ff8a181ac8cb';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -8,62 +10,86 @@ Deno.serve(async (req) => {
   console.log("🚀 ai-chat function called");
 
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight");
-    return new Response(null, {
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Processing POST request");
-    
     const requestData = await req.json();
     const { message, threadId, notionContext } = requestData;
     
-    console.log('Received data:', { 
+    console.log('Received:', { 
       message: message?.substring(0, 50) + "...", 
       threadId, 
-      hasNotionContext: !!notionContext 
+      databasesCount: notionContext?.availableDatabases?.length || 0
     });
 
-    // Odpowiedź w formacie oczekiwanym przez aplikację
-    const aiResponse = {
-      response: `Cześć! Otrzymałem twoją wiadomość: "${message}". 
+    // Przygotuj wybrane bazy wiedzy dla n8n
+    let selectedDatabases = [];
+    
+    if (notionContext && notionContext.availableDatabases) {
+      // TODO: Frontend pozwoli wybrać bazy - na razie bierz pierwsze 5
+      selectedDatabases = notionContext.availableDatabases.slice(0, 5).map(db => ({
+        id: db.id,
+        name: db.name || db.title,
+        description: db.description || '',
+        pages: db.pages || [],
+        attributes: db.attributes || []
+      }));
+    }
 
-Mam dostęp do ${notionContext?.availableDatabases?.length || 0} baz danych Notion. 
-
-Funkcja AI chat działa poprawnie! 🎉
-
-ThreadId: ${threadId}`,
-      success: true
+    // Dane dla n8n
+    const payload = {
+      message: message,
+      threadId: threadId,
+      selectedDatabases: selectedDatabases,
+      userRequest: {
+        text: message,
+        timestamp: new Date().toISOString(),
+        language: 'pl'
+      },
+      context: {
+        totalDatabases: notionContext?.availableDatabases?.length || 0,
+        selectedCount: selectedDatabases.length
+      }
     };
 
-    console.log('Returning AI response:', { 
-      responseLength: aiResponse.response.length, 
-      success: aiResponse.success 
+    console.log('Sending to n8n:', selectedDatabases.map(db => db.name));
+
+    // Wyślij do n8n
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
+    if (!response.ok) {
+      throw new Error(`n8n webhook error: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    console.log('n8n response received');
+
+    // Parsuj odpowiedź z n8n
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(responseText);
+    } catch (e) {
+      aiResponse = { response: responseText, success: true };
+    }
+
     return new Response(JSON.stringify(aiResponse), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Function error:', error);
+    console.error('Error:', error);
     
     return new Response(JSON.stringify({ 
-      response: "Przepraszam, wystąpił błąd w funkcji AI.",
-      success: false,
-      error: error.message
+      response: "Przepraszam, wystąpił błąd podczas przetwarzania zapytania.",
+      success: false 
     }), {
-      status: 200, // Zwracamy 200 nawet dla błędów, żeby aplikacja mogła pokazać wiadomość
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
