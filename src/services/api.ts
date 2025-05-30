@@ -51,20 +51,46 @@ class APIService {
 
       if (error) {
         console.error("Supabase function error:", error);
-        throw error;
+        
+        // Check if it's an authentication error
+        if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
+          throw new Error('Notion API key is invalid. Please check your Notion integration token.');
+        }
+        
+        throw new Error(`Failed to fetch databases: ${error.message}`);
       }
       
       console.log("Notion databases response:", data);
-      return data || [];
+      
+      // Handle different response formats
+      if (data && Array.isArray(data)) {
+        return data;
+      } else if (data && data.databases && Array.isArray(data.databases)) {
+        return data.databases;
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      }
+      
+      return [];
     } catch (error) {
       console.error("Error fetching Notion databases:", error);
-      throw error;
+      
+      // Re-throw with user-friendly message
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Unable to connect to Notion. Please verify your API key.');
     }
   }
 
   async getNotionPages(databaseId: string): Promise<NotionPage[]> {
     try {
       console.log(`Fetching pages for database ${databaseId}...`);
+      
+      if (!databaseId) {
+        throw new Error('Database ID is required');
+      }
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
         body: { 
@@ -75,11 +101,18 @@ class APIService {
 
       if (error) {
         console.error("Supabase function error:", error);
-        throw error;
+        throw new Error(`Failed to fetch pages: ${error.message}`);
       }
       
       console.log("Notion pages response:", data);
-      return data || [];
+      
+      if (data && Array.isArray(data)) {
+        return data;
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      }
+      
+      return [];
     } catch (error) {
       console.error("Error fetching Notion pages:", error);
       throw error;
@@ -90,6 +123,10 @@ class APIService {
     try {
       console.log(`Fetching attributes for database ${databaseId}...`);
       
+      if (!databaseId) {
+        throw new Error('Database ID is required');
+      }
+      
       const { data, error } = await supabase.functions.invoke('notion-integration', {
         body: { 
           action: 'attributes',
@@ -99,11 +136,18 @@ class APIService {
 
       if (error) {
         console.error("Supabase function error:", error);
-        throw error;
+        throw new Error(`Failed to fetch attributes: ${error.message}`);
       }
       
       console.log("Notion attributes response:", data);
-      return data || [];
+      
+      if (data && Array.isArray(data)) {
+        return data;
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      }
+      
+      return [];
     } catch (error) {
       console.error("Error fetching Notion attributes:", error);
       throw error;
@@ -124,11 +168,18 @@ class APIService {
 
       if (error) {
         console.error("Supabase function error:", error);
-        throw error;
+        throw new Error(`Failed to query data: ${error.message}`);
       }
       
       console.log("Notion query response:", data);
-      return data || [];
+      
+      if (data && Array.isArray(data)) {
+        return data;
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      }
+      
+      return [];
     } catch (error) {
       console.error("Error querying Notion data:", error);
       throw error;

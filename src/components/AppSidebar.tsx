@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Database, FileText, Filter, MessageCircle, Search } from "lucide-react";
+import { Database, FileText, Filter, MessageCircle, Search, AlertCircle } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ThreadsList } from "@/components/ThreadsList";
 import { useNotionDatabases, useNotionPages, useNotionAttributes } from "@/hooks/useNotionData";
 
@@ -31,9 +32,9 @@ export function AppSidebar() {
   const [pageSearch, setPageSearch] = useState("");
   const [attributeSearch, setAttributeSearch] = useState("");
 
-  const { databases, loading: databasesLoading } = useNotionDatabases();
-  const { pages, loading: pagesLoading } = useNotionPages(selectedDatabase || null);
-  const { attributes, loading: attributesLoading } = useNotionAttributes(selectedDatabase || null);
+  const { databases, loading: databasesLoading, error: databasesError } = useNotionDatabases();
+  const { pages, loading: pagesLoading, error: pagesError } = useNotionPages(selectedDatabase || null);
+  const { attributes, loading: attributesLoading, error: attributesError } = useNotionAttributes(selectedDatabase || null);
 
   const filteredDatabases = databases.filter(db =>
     db.name.toLowerCase().includes(databaseSearch.toLowerCase())
@@ -81,6 +82,15 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="space-y-2">
+              {databasesError && (
+                <Alert className="mb-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {databasesError}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -88,6 +98,7 @@ export function AppSidebar() {
                   value={databaseSearch}
                   onChange={(e) => setDatabaseSearch(e.target.value)}
                   className="pl-10 bg-white border-slate-200"
+                  disabled={databasesLoading}
                 />
               </div>
               <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
@@ -98,6 +109,10 @@ export function AppSidebar() {
                   {databasesLoading ? (
                     <SelectItem value="loading" disabled>
                       Ładowanie...
+                    </SelectItem>
+                  ) : filteredDatabases.length === 0 ? (
+                    <SelectItem value="no-data" disabled>
+                      {databasesError ? 'Błąd połączenia' : 'Brak baz danych'}
                     </SelectItem>
                   ) : (
                     filteredDatabases.map((db) => (
@@ -132,6 +147,15 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="space-y-2">
+              {pagesError && (
+                <Alert className="mb-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {pagesError}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -139,7 +163,7 @@ export function AppSidebar() {
                   value={pageSearch}
                   onChange={(e) => setPageSearch(e.target.value)}
                   className="pl-10 bg-white border-slate-200"
-                  disabled={!selectedDatabase}
+                  disabled={!selectedDatabase || pagesLoading}
                 />
               </div>
               <Select 
@@ -154,6 +178,10 @@ export function AppSidebar() {
                   {pagesLoading ? (
                     <SelectItem value="loading" disabled>
                       Ładowanie...
+                    </SelectItem>
+                  ) : filteredPages.length === 0 ? (
+                    <SelectItem value="no-data" disabled>
+                      {pagesError ? 'Błąd połączenia' : 'Brak stron'}
                     </SelectItem>
                   ) : (
                     filteredPages.map((page) => (
@@ -176,6 +204,15 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="space-y-3">
+              {attributesError && (
+                <Alert className="mb-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {attributesError}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -183,11 +220,15 @@ export function AppSidebar() {
                   value={attributeSearch}
                   onChange={(e) => setAttributeSearch(e.target.value)}
                   className="pl-10 bg-white border-slate-200"
-                  disabled={!selectedDatabase}
+                  disabled={!selectedDatabase || attributesLoading}
                 />
               </div>
               {attributesLoading ? (
                 <div className="text-sm text-slate-500">Ładowanie atrybutów...</div>
+              ) : filteredAttributes.length === 0 ? (
+                <div className="text-sm text-slate-500">
+                  {attributesError ? 'Błąd połączenia' : 'Brak atrybutów'}
+                </div>
               ) : (
                 <div className="space-y-3">
                   {filteredAttributes.map((attr) => (

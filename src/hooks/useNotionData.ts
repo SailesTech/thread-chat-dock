@@ -10,12 +10,23 @@ export function useNotionDatabases() {
   const fetchDatabases = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getNotionDatabases();
-      setDatabases(data);
       setError(null);
+      console.log('Hook: Starting to fetch databases...');
+      
+      const data = await apiService.getNotionDatabases();
+      console.log('Hook: Received databases:', data);
+      
+      setDatabases(data);
     } catch (err) {
-      setError('Failed to fetch databases');
-      console.error(err);
+      console.error('Hook: Error fetching databases:', err);
+      
+      let errorMessage = 'Failed to fetch databases';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setDatabases([]);
     } finally {
       setLoading(false);
     }
@@ -36,18 +47,27 @@ export function useNotionPages(databaseId: string | null) {
   useEffect(() => {
     if (!databaseId) {
       setPages([]);
+      setError(null);
       return;
     }
 
     const fetchPages = async () => {
       try {
         setLoading(true);
+        setError(null);
+        
         const data = await apiService.getNotionPages(databaseId);
         setPages(data);
-        setError(null);
       } catch (err) {
-        setError('Failed to fetch pages');
-        console.error(err);
+        console.error('Hook: Error fetching pages:', err);
+        
+        let errorMessage = 'Failed to fetch pages';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
+        setPages([]);
       } finally {
         setLoading(false);
       }
@@ -67,18 +87,27 @@ export function useNotionAttributes(databaseId: string | null) {
   useEffect(() => {
     if (!databaseId) {
       setAttributes([]);
+      setError(null);
       return;
     }
 
     const fetchAttributes = async () => {
       try {
         setLoading(true);
+        setError(null);
+        
         const data = await apiService.getNotionAttributes(databaseId);
         setAttributes(data);
-        setError(null);
       } catch (err) {
-        setError('Failed to fetch attributes');
-        console.error(err);
+        console.error('Hook: Error fetching attributes:', err);
+        
+        let errorMessage = 'Failed to fetch attributes';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
+        setAttributes([]);
       } finally {
         setLoading(false);
       }
