@@ -46,11 +46,15 @@ class APIService {
       console.log("Fetching Notion databases...");
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
-        method: 'GET',
-        body: new URLSearchParams({ action: 'databases' })
+        body: { action: 'databases' }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Notion databases response:", data);
       return data || [];
     } catch (error) {
       console.error("Error fetching Notion databases:", error);
@@ -63,14 +67,18 @@ class APIService {
       console.log(`Fetching pages for database ${databaseId}...`);
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
-        method: 'GET',
-        body: new URLSearchParams({ 
+        body: { 
           action: 'pages',
           database_id: databaseId 
-        })
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Notion pages response:", data);
       return data || [];
     } catch (error) {
       console.error("Error fetching Notion pages:", error);
@@ -83,14 +91,18 @@ class APIService {
       console.log(`Fetching attributes for database ${databaseId}...`);
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
-        method: 'GET',
-        body: new URLSearchParams({ 
+        body: { 
           action: 'attributes',
           database_id: databaseId 
-        })
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Notion attributes response:", data);
       return data || [];
     } catch (error) {
       console.error("Error fetching Notion attributes:", error);
@@ -103,15 +115,19 @@ class APIService {
       console.log(`Querying Notion data with: ${query}`, filters);
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
-        method: 'GET',
-        body: new URLSearchParams({ 
+        body: { 
           action: 'query',
           query: query,
-          filters: filters ? JSON.stringify(filters) : ''
-        })
+          filters: filters
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Notion query response:", data);
       return data || [];
     } catch (error) {
       console.error("Error querying Notion data:", error);

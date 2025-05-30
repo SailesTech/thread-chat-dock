@@ -27,26 +27,33 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    // Check if Notion API key is configured
+    if (!notionApiKey) {
+      console.error('NOTION_API_KEY is not configured');
+      return new Response(JSON.stringify({ 
+        error: 'Notion API key is not configured. Please add your Notion API key in the project settings.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    console.log(`Notion API action: ${action}`);
+    const requestBody = await req.json();
+    const { action, database_id, query, filters } = requestBody;
+
+    console.log(`Notion API action: ${action}`, { database_id, query, filters });
 
     switch (action) {
       case 'databases':
         return await getDatabases();
       case 'pages':
-        const databaseId = url.searchParams.get('database_id');
-        return await getPages(databaseId);
+        return await getPages(database_id);
       case 'attributes':
-        const dbId = url.searchParams.get('database_id');
-        return await getAttributes(dbId);
+        return await getAttributes(database_id);
       case 'query':
-        const { searchParams } = url;
-        const query = searchParams.get('query');
-        const filters = searchParams.get('filters');
         return await queryNotionData(query, filters);
       default:
+        console.error(`Invalid action: ${action}`);
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -54,7 +61,10 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error in notion-integration function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      details: error.toString()
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -62,6 +72,8 @@ serve(async (req) => {
 });
 
 async function getDatabases() {
+  console.log('Calling Notion API to fetch databases...');
+  
   const response = await fetch('https://api.notion.com/v1/search', {
     method: 'POST',
     headers: {
@@ -78,16 +90,21 @@ async function getDatabases() {
   });
 
   if (!response.ok) {
-    throw new Error(`Notion API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error(`Notion API error: ${response.status} - ${errorText}`);
+    throw new Error(`Notion API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log(`Found ${data.results.length} databases`);
   
   const databases = data.results.map((db: NotionDatabase) => ({
     id: db.id,
     name: db.title?.[0]?.plain_text || 'Untitled Database',
     available: true
   }));
+
+  console.log('Processed databases:', databases);
 
   return new Response(JSON.stringify(databases), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -96,11 +113,14 @@ async function getDatabases() {
 
 async function getPages(databaseId: string | null) {
   if (!databaseId) {
+    console.error('Database ID is required for fetching pages');
     return new Response(JSON.stringify({ error: 'Database ID required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+
+  console.log(`Calling Notion API to fetch pages for database: ${databaseId}`);
 
   const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
     method: 'POST',
@@ -115,10 +135,13 @@ async function getPages(databaseId: string | null) {
   });
 
   if (!response.ok) {
-    throw new Error(`Notion API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error(`Notion API error: ${response.status} - ${errorText}`);
+    throw new Error(`Notion API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log(`Found ${data.results.length} pages`);
   
   const pages = data.results.map((page: NotionPage) => {
     const titleProperty = Object.values(page.properties).find((prop: any) => 
@@ -133,6 +156,8 @@ async function getPages(databaseId: string | null) {
     };
   });
 
+  console.log('Processed pages:', pages);
+
   return new Response(JSON.stringify(pages), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
@@ -140,11 +165,14 @@ async function getPages(databaseId: string | null) {
 
 async function getAttributes(databaseId: string | null) {
   if (!databaseId) {
+    console.error('Database ID is required for fetching attributes');
     return new Response(JSON.stringify({ error: 'Database ID required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+
+  console.log(`Calling Notion API to fetch attributes for database: ${databaseId}`);
 
   const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
     method: 'GET',
@@ -156,10 +184,13 @@ async function getAttributes(databaseId: string | null) {
   });
 
   if (!response.ok) {
-    throw new Error(`Notion API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error(`Notion API error: ${response.status} - ${errorText}`);
+    throw new Error(`Notion API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log(`Found ${Object.keys(data.properties).length} attributes`);
   
   const attributes = Object.entries(data.properties).map(([name, property]: [string, any]) => ({
     id: name,
@@ -168,12 +199,14 @@ async function getAttributes(databaseId: string | null) {
     database_id: databaseId
   }));
 
+  console.log('Processed attributes:', attributes);
+
   return new Response(JSON.stringify(attributes), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
-async function queryNotionData(query: string | null, filters: string | null) {
+async function queryNotionData(query: string | null, filters: any) {
   // This is a simplified query implementation
   // In a real app, you'd parse the query and convert it to Notion API filters
   console.log('Querying Notion data:', { query, filters });
