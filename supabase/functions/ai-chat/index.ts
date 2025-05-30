@@ -1,62 +1,82 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const WEBHOOK_URL = 'https://n8n-production-2e02.up.railway.app/webhook/3389e498-f059-447c-a1a8-ff8a181ac8cb';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    });
   }
 
   try {
-    // Pobierz dane z requestu
-    const requestData = await req.json();
-    const { message, threadId, notionContext } = requestData;
+    console.log('Request method:', req.method);
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
-    console.log('Received request:', { message, threadId, notionContext });
+    // Parse request body
+    const body = await req.text();
+    console.log('Request body:', body);
+    
+    let requestData;
+    try {
+      requestData = JSON.parse(body);
+    } catch (e) {
+      console.error('JSON parse error:', e);
+      throw new Error('Invalid JSON in request body');
+    }
 
-    // Wyślij POST do webhooka
+    console.log('Parsed request data:', requestData);
+
+    // Forward to webhook
+    console.log('Forwarding to webhook:', WEBHOOK_URL);
+    
     const webhookResponse = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        message,
-        threadId,
-        notionContext
-      }),
+      body: JSON.stringify(requestData),
     });
 
-    if (!webhookResponse.ok) {
-      const errorText = await webhookResponse.text();
-      console.error('Webhook error:', webhookResponse.status, errorText);
-      throw new Error(`Webhook error: ${webhookResponse.status} - ${errorText}`);
+    console.log('Webhook response status:', webhookResponse.status);
+    
+    const responseText = await webhookResponse.text();
+    console.log('Webhook response text:', responseText);
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.log('Webhook returned non-JSON, using as text');
+      responseData = { response: responseText };
     }
 
-    // Pobierz odpowiedź z webhooka
-    const webhookData = await webhookResponse.json();
-    console.log('Webhook response:', webhookData);
-
-    // Zwróć odpowiedź
-    return new Response(JSON.stringify(webhookData), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify(responseData), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
 
   } catch (error) {
-    console.error('Error in ai-chat function:', error);
+    console.error('Function error:', error);
     
     return new Response(JSON.stringify({ 
       error: error.message,
       success: false 
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
   }
 });
