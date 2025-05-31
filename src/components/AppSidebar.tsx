@@ -7,6 +7,8 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,9 @@ export function AppSidebar() {
   if (isCollapsed) {
     return (
       <Sidebar className="w-14">
+        <SidebarHeader className="p-2">
+          <SidebarTrigger />
+        </SidebarHeader>
         <SidebarContent className="flex flex-col items-center gap-4 pt-4">
           <Filter className="h-6 w-6 text-slate-400" />
           <MessageCircle className="h-6 w-6 text-slate-400" />
@@ -61,6 +66,13 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="w-80 border-r bg-white/50 backdrop-blur-sm">
+      <SidebarHeader className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-800">Filtry Notion</h2>
+          <SidebarTrigger />
+        </div>
+      </SidebarHeader>
+      
       <SidebarContent className="p-4 space-y-6">
         {/* Wybór bazy danych */}
         <SidebarGroup>

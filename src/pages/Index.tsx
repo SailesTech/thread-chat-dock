@@ -1,5 +1,5 @@
 
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ChatArea } from "@/components/ChatArea";
 import { Header } from "@/components/Header";
@@ -30,12 +30,12 @@ function AppContent() {
       <SidebarProvider defaultOpen={true}>
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
           <AppSidebar />
-          <div className="flex flex-col flex-1 min-w-0">
+          <SidebarInset className="flex flex-col flex-1">
             <Header />
             <main className="flex-1 flex flex-col overflow-hidden">
               <ChatArea />
             </main>
-          </div>
+          </SidebarInset>
         </div>
       </SidebarProvider>
     </NotionSelectionProvider>

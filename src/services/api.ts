@@ -1,4 +1,3 @@
-
 // API Service for Notion and Chat integration
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,7 +45,7 @@ class APIService {
       console.log("Fetching Notion databases...");
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
-        body: { action: 'databases' }
+        body: { action: 'get_databases' }
       });
 
       if (error) {
@@ -63,10 +62,12 @@ class APIService {
       console.log("Notion databases response:", data);
       
       // Handle different response formats
-      if (data && Array.isArray(data)) {
-        return data;
-      } else if (data && data.databases && Array.isArray(data.databases)) {
-        return data.databases;
+      if (data && Array.isArray(data.databases)) {
+        return data.databases.map((db: any) => ({
+          id: db.id,
+          name: db.name,
+          available: true
+        }));
       } else if (data && data.error) {
         throw new Error(data.error);
       }
@@ -94,7 +95,7 @@ class APIService {
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
         body: { 
-          action: 'pages',
+          action: 'get_pages',
           database_id: databaseId 
         }
       });
@@ -106,8 +107,13 @@ class APIService {
       
       console.log("Notion pages response:", data);
       
-      if (data && Array.isArray(data)) {
-        return data;
+      if (data && Array.isArray(data.pages)) {
+        return data.pages.map((page: any) => ({
+          id: page.id,
+          title: page.name,
+          name: page.name,
+          database_id: databaseId
+        }));
       } else if (data && data.error) {
         throw new Error(data.error);
       }
@@ -129,7 +135,7 @@ class APIService {
       
       const { data, error } = await supabase.functions.invoke('notion-integration', {
         body: { 
-          action: 'attributes',
+          action: 'get_attributes',
           database_id: databaseId 
         }
       });
@@ -141,8 +147,13 @@ class APIService {
       
       console.log("Notion attributes response:", data);
       
-      if (data && Array.isArray(data)) {
-        return data;
+      if (data && Array.isArray(data.attributes)) {
+        return data.attributes.map((attr: any) => ({
+          id: attr.id,
+          name: attr.name,
+          type: attr.type,
+          database_id: databaseId
+        }));
       } else if (data && data.error) {
         throw new Error(data.error);
       }
