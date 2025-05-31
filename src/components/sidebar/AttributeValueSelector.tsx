@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNotionSelection } from "@/contexts/NotionSelectionContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AttributeOption {
   id: string;
@@ -39,40 +40,42 @@ export function AttributeValueSelector({
   // Pobierz opcje dla tego atrybutu
   useEffect(() => {
     const fetchOptions = async () => {
-      if (!databaseId || (attributeType !== 'select' && attributeType !== 'multi_select')) {
+      if (!databaseId || (attributeType !== 'select' && attributeType !== 'multi_select' && attributeType !== 'status')) {
         return;
       }
 
       setLoading(true);
       try {
-        const response = await fetch('/functions/v1/notion-integration', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        console.log(`Fetching options for attribute "${attributeName}" (${attributeType}) in database ${databaseId}`);
+        
+        const { data, error } = await supabase.functions.invoke('notion-integration', {
+          body: {
             action: 'get_database_properties',
             database_id: databaseId,
             property_name: attributeName
-          })
+          }
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Property options response:', data);
-          
-          if (data.property && data.property.options) {
-            setOptions(data.property.options.map((option: any) => ({
-              id: option.id,
-              name: option.name,
-              color: option.color
-            })));
-          }
+        if (error) {
+          console.error('Supabase function error:', error);
+          return;
+        }
+        
+        console.log(`Property "${attributeName}" response:`, data);
+        
+        if (data && data.property && data.property.options) {
+          setOptions(data.property.options.map((option: any) => ({
+            id: option.id,
+            name: option.name,
+            color: option.color
+          })));
         } else {
-          console.error('Failed to fetch property options:', response.statusText);
+          console.log(`No options found for property "${attributeName}"`);
+          setOptions([]);
         }
       } catch (error) {
         console.error('Error fetching property options:', error);
+        setOptions([]);
       } finally {
         setLoading(false);
       }
@@ -85,7 +88,7 @@ export function AttributeValueSelector({
     if (selectedValues.includes(optionId)) {
       removeAttributeValue(attributeId, optionId);
     } else {
-      if (!isMultiSelect) {
+      if (!isMultiSelect && attributeType !== 'status') {
         // For single select, clear other values first
         selectedValues.forEach(value => {
           removeAttributeValue(attributeId, value);
@@ -95,7 +98,7 @@ export function AttributeValueSelector({
     }
   };
 
-  if (attributeType !== 'select' && attributeType !== 'multi_select') {
+  if (attributeType !== 'select' && attributeType !== 'multi_select' && attributeType !== 'status') {
     return null;
   }
 
@@ -123,7 +126,7 @@ export function AttributeValueSelector({
         <PopoverContent className="w-64 p-2" align="start">
           <div className="space-y-2">
             <div className="text-xs font-medium text-slate-600 mb-2">
-              {attributeName} ({isMultiSelect ? 'multi' : 'single'})
+              {attributeName} ({isMultiSelect ? 'multi' : attributeType === 'status' ? 'status' : 'single'})
             </div>
             {loading ? (
               <div className="text-xs text-slate-500">Ładowanie opcji...</div>

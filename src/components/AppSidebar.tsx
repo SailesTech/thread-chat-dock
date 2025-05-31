@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Filter, MessageCircle, Search, AlertCircle } from "lucide-react";
 import {
@@ -156,7 +155,7 @@ export function AppSidebar() {
                         
                         {/* Selector wartości atrybutu */}
                         {selectedAttributes.includes(attr.id) && 
-                         (attr.type === 'select' || attr.type === 'multi_select') && (
+                         (attr.type === 'select' || attr.type === 'multi_select' || attr.type === 'status') && (
                           <AttributeValueSelector
                             attributeId={attr.id}
                             attributeName={attr.name}

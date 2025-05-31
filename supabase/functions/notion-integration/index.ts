@@ -212,6 +212,7 @@ Deno.serve(async (req) => {
 
       let propertyData = { type: property.type };
 
+      // Handle different property types
       if (property.type === 'select' && property.select?.options) {
         propertyData = {
           ...propertyData,
@@ -221,6 +222,11 @@ Deno.serve(async (req) => {
         propertyData = {
           ...propertyData,
           options: property.multi_select.options
+        };
+      } else if (property.type === 'status' && property.status?.options) {
+        propertyData = {
+          ...propertyData,
+          options: property.status.options
         };
       }
 
