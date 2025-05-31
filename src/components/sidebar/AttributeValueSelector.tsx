@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +93,8 @@ export function AttributeValueSelector({
           removeAttributeValue(attributeId, value);
         });
       }
-      addAttributeValue(attributeId, attributeName, optionId);
+      // ✅ POPRAWKA: Dodaj optionName jako 4ty parametr
+      addAttributeValue(attributeId, attributeName, optionId, optionName);
     }
   };
 
