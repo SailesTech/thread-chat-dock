@@ -1,10 +1,10 @@
-
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface AttributeValue {
   attributeId: string;
   attributeName: string;
-  selectedValues: string[];
+  selectedValues: string[];        // ✅ IDs dla n8n query
+  selectedNames?: string[];        // ✅ Nazwy dla AI/display
 }
 
 interface NotionSelectionState {
@@ -19,7 +19,7 @@ interface NotionSelectionContextType extends NotionSelectionState {
   setSelectedPage: (id: string) => void;
   setSelectedAttributes: (ids: string[]) => void;
   setSelectedAttributeValues: (values: AttributeValue[]) => void;
-  addAttributeValue: (attributeId: string, attributeName: string, value: string) => void;
+  addAttributeValue: (attributeId: string, attributeName: string, valueId: string, valueName?: string) => void; // ✅ Dodano valueName
   removeAttributeValue: (attributeId: string, value: string) => void;
   clearSelection: () => void;
   hasSelection: boolean;
@@ -34,28 +34,49 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
   const [selectedAttributeValues, setSelectedAttributeValues] = useState<AttributeValue[]>([]);
 
-  const addAttributeValue = (attributeId: string, attributeName: string, value: string) => {
+  // ✅ Nowa funkcja przyjmująca ID i nazwę
+  const addAttributeValue = (attributeId: string, attributeName: string, valueId: string, valueName?: string) => {
     setSelectedAttributeValues(prev => {
       const existing = prev.find(av => av.attributeId === attributeId);
+      
       if (existing) {
+        // Aktualizuj istniejący atrybut
         return prev.map(av => 
           av.attributeId === attributeId
-            ? { ...av, selectedValues: [...av.selectedValues, value] }
+            ? { 
+                ...av, 
+                selectedValues: [...av.selectedValues, valueId],                    // ✅ Dodaj ID
+                selectedNames: [...(av.selectedNames || []), valueName || valueId]  // ✅ Dodaj nazwę
+              }
             : av
         );
       } else {
-        return [...prev, { attributeId, attributeName, selectedValues: [value] }];
+        // Dodaj nowy atrybut
+        return [...prev, { 
+          attributeId, 
+          attributeName, 
+          selectedValues: [valueId],                    // ✅ ID dla n8n
+          selectedNames: [valueName || valueId]        // ✅ Nazwa dla AI
+        }];
       }
     });
   };
 
-  const removeAttributeValue = (attributeId: string, value: string) => {
+  const removeAttributeValue = (attributeId: string, valueId: string) => {
     setSelectedAttributeValues(prev => 
-      prev.map(av => 
-        av.attributeId === attributeId
-          ? { ...av, selectedValues: av.selectedValues.filter(v => v !== value) }
-          : av
-      ).filter(av => av.selectedValues.length > 0)
+      prev.map(av => {
+        if (av.attributeId === attributeId) {
+          const valueIndex = av.selectedValues.indexOf(valueId);
+          return {
+            ...av,
+            selectedValues: av.selectedValues.filter(v => v !== valueId),
+            selectedNames: av.selectedNames 
+              ? av.selectedNames.filter((_, index) => index !== valueIndex)
+              : av.selectedNames
+          };
+        }
+        return av;
+      }).filter(av => av.selectedValues.length > 0)
     );
   };
 
