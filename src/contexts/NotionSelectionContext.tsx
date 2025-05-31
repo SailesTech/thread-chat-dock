@@ -1,29 +1,39 @@
-
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface AttributeValue {
-  attributeId: string;
-  attributeName: string;
-  selectedValues: string[];
+  id: string;
+  name: string;
+  color?: string;
+}
+
+interface SelectedAttribute {
+  id: string;
+  name: string;
+  type: string;
+  database_id: string;
+  availableOptions?: AttributeValue[]; // Dostępne opcje (select/multi_select)
+  selectedValues?: string[]; // Wybrane wartości przez użytkownika
 }
 
 interface NotionSelectionState {
   selectedDatabase: string;
   selectedPage: string;
-  selectedAttributes: string[];
-  selectedAttributeValues: AttributeValue[];
+  selectedAttributes: SelectedAttribute[]; // ✅ Zmieniony typ z string[] na SelectedAttribute[]
 }
 
 interface NotionSelectionContextType extends NotionSelectionState {
   setSelectedDatabase: (id: string) => void;
   setSelectedPage: (id: string) => void;
-  setSelectedAttributes: (ids: string[]) => void;
-  setSelectedAttributeValues: (values: AttributeValue[]) => void;
-  addAttributeValue: (attributeId: string, attributeName: string, value: string) => void;
-  removeAttributeValue: (attributeId: string, value: string) => void;
+  setSelectedAttributes: (attributes: SelectedAttribute[]) => void;
+  
+  // ✅ Nowe funkcje do zarządzania wartościami atrybutów
+  addAttributeWithValues: (attribute: SelectedAttribute) => void;
+  updateAttributeValues: (attributeId: string, selectedValues: string[]) => void;
+  removeAttribute: (attributeId: string) => void;
+  
   clearSelection: () => void;
   hasSelection: boolean;
-  getThreadTitle: () => string;
+  hasAttributesWithValues: boolean;
 }
 
 const NotionSelectionContext = createContext<NotionSelectionContextType | undefined>(undefined);
@@ -31,78 +41,54 @@ const NotionSelectionContext = createContext<NotionSelectionContextType | undefi
 export function NotionSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedDatabase, setSelectedDatabase] = useState<string>("");
   const [selectedPage, setSelectedPage] = useState<string>("");
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
-  const [selectedAttributeValues, setSelectedAttributeValues] = useState<AttributeValue[]>([]);
+  const [selectedAttributes, setSelectedAttributes] = useState<SelectedAttribute[]>([]);
 
-  const addAttributeValue = (attributeId: string, attributeName: string, value: string) => {
-    setSelectedAttributeValues(prev => {
-      const existing = prev.find(av => av.attributeId === attributeId);
-      if (existing) {
-        return prev.map(av => 
-          av.attributeId === attributeId
-            ? { ...av, selectedValues: [...av.selectedValues, value] }
-            : av
-        );
-      } else {
-        return [...prev, { attributeId, attributeName, selectedValues: [value] }];
-      }
+  const addAttributeWithValues = (attribute: SelectedAttribute) => {
+    setSelectedAttributes(prev => {
+      // Usuń jeśli już istnieje, dodaj nowy
+      const filtered = prev.filter(attr => attr.id !== attribute.id);
+      return [...filtered, attribute];
     });
   };
 
-  const removeAttributeValue = (attributeId: string, value: string) => {
-    setSelectedAttributeValues(prev => 
-      prev.map(av => 
-        av.attributeId === attributeId
-          ? { ...av, selectedValues: av.selectedValues.filter(v => v !== value) }
-          : av
-      ).filter(av => av.selectedValues.length > 0)
+  const updateAttributeValues = (attributeId: string, selectedValues: string[]) => {
+    setSelectedAttributes(prev => 
+      prev.map(attr => 
+        attr.id === attributeId 
+          ? { ...attr, selectedValues }
+          : attr
+      )
     );
+  };
+
+  const removeAttribute = (attributeId: string) => {
+    setSelectedAttributes(prev => prev.filter(attr => attr.id !== attributeId));
   };
 
   const clearSelection = () => {
     setSelectedDatabase("");
     setSelectedPage("");
     setSelectedAttributes([]);
-    setSelectedAttributeValues([]);
-  };
-
-  const getThreadTitle = () => {
-    const parts = [];
-    
-    if (selectedDatabase) {
-      parts.push(`DB`);
-    }
-    
-    if (selectedPage) {
-      parts.push(`Page`);
-    }
-    
-    if (selectedAttributeValues.length > 0) {
-      const attrSummary = selectedAttributeValues
-        .map(av => `${av.attributeName}(${av.selectedValues.length})`)
-        .join(', ');
-      parts.push(attrSummary);
-    }
-    
-    return parts.length > 0 ? parts.join(' | ') : 'Nowy czat';
   };
 
   const hasSelection = selectedDatabase !== "";
+  const hasAttributesWithValues = selectedAttributes.some(attr => 
+    attr.selectedValues && attr.selectedValues.length > 0
+  );
 
   const value = {
     selectedDatabase,
     selectedPage,
     selectedAttributes,
-    selectedAttributeValues,
     setSelectedDatabase,
     setSelectedPage,
     setSelectedAttributes,
-    setSelectedAttributeValues,
-    addAttributeValue,
-    removeAttributeValue,
+    addAttributeWithValues,
+    updateAttributeValues,
+    removeAttribute,
     clearSelection,
     hasSelection,
-    getThreadTitle,
+    hasAttributesWithValues,
   };
 
   return (
@@ -119,3 +105,6 @@ export function useNotionSelection() {
   }
   return context;
 }
+
+// ✅ Export types for use in other components
+export type { SelectedAttribute, AttributeValue };
