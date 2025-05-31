@@ -46,40 +46,6 @@ export function AppSidebar() {
     );
   };
 
-  // Pobierz rzeczywiste opcje z API dla atrybutów select
-  const getAttributeOptions = async (attribute: any) => {
-    if (!selectedDatabase || (attribute.type !== 'select' && attribute.type !== 'multi_select')) {
-      return [];
-    }
-
-    try {
-      // Pobierz szczegóły bazy danych z Notion API
-      const response = await fetch(`https://api.notion.com/v1/databases/${selectedDatabase}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.NOTION_API_KEY}`,
-          'Notion-Version': '2022-06-28',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const property = data.properties[attribute.name];
-        
-        if (property && (property.type === 'select' || property.type === 'multi_select')) {
-          return property[property.type].options.map((option: any) => ({
-            id: option.id,
-            name: option.name,
-            color: option.color,
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching attribute options:', error);
-    }
-
-    return [];
-  };
-
   const isCollapsed = state === "collapsed";
 
   if (isCollapsed) {
@@ -183,7 +149,7 @@ export function AppSidebar() {
                             attributeId={attr.id}
                             attributeName={attr.name}
                             attributeType={attr.type}
-                            options={[]} // Będzie pobrane asynchronicznie
+                            databaseId={selectedDatabase}
                           />
                         )}
                       </div>

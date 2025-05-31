@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,22 +17,69 @@ interface AttributeValueSelectorProps {
   attributeId: string;
   attributeName: string;
   attributeType: string;
-  options: AttributeOption[];
+  databaseId: string;
 }
 
 export function AttributeValueSelector({ 
   attributeId, 
   attributeName, 
-  attributeType, 
-  options 
+  attributeType,
+  databaseId
 }: AttributeValueSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [options, setOptions] = useState<AttributeOption[]>([]);
+  const [loading, setLoading] = useState(false);
   const { selectedAttributeValues, addAttributeValue, removeAttributeValue } = useNotionSelection();
   
   const currentSelection = selectedAttributeValues.find(av => av.attributeId === attributeId);
   const selectedValues = currentSelection?.selectedValues || [];
   
   const isMultiSelect = attributeType === 'multi_select';
+
+  // Pobierz opcje dla tego atrybutu
+  useEffect(() => {
+    const fetchOptions = async () => {
+      if (!databaseId || (attributeType !== 'select' && attributeType !== 'multi_select')) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch('/functions/v1/notion-integration', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'get_database_properties',
+            database_id: databaseId,
+            property_name: attributeName
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Property options response:', data);
+          
+          if (data.property && data.property.options) {
+            setOptions(data.property.options.map((option: any) => ({
+              id: option.id,
+              name: option.name,
+              color: option.color
+            })));
+          }
+        } else {
+          console.error('Failed to fetch property options:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching property options:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOptions();
+  }, [databaseId, attributeName, attributeType]);
   
   const handleValueToggle = (optionId: string, optionName: string) => {
     if (selectedValues.includes(optionId)) {
@@ -48,7 +95,7 @@ export function AttributeValueSelector({
     }
   };
 
-  if (!options || options.length === 0) {
+  if (attributeType !== 'select' && attributeType !== 'multi_select') {
     return null;
   }
 
@@ -60,11 +107,14 @@ export function AttributeValueSelector({
             variant="outline"
             size="sm"
             className="w-full justify-between text-xs"
+            disabled={loading}
           >
             <span>
-              {selectedValues.length > 0 
-                ? `${selectedValues.length} wybranych`
-                : `Wybierz ${attributeName}`
+              {loading 
+                ? "Ładowanie..."
+                : selectedValues.length > 0 
+                  ? `${selectedValues.length} wybranych`
+                  : `Wybierz ${attributeName}`
               }
             </span>
             <ChevronDown className="h-3 w-3" />
@@ -75,31 +125,37 @@ export function AttributeValueSelector({
             <div className="text-xs font-medium text-slate-600 mb-2">
               {attributeName} ({isMultiSelect ? 'multi' : 'single'})
             </div>
-            {options.map((option) => {
-              const isSelected = selectedValues.includes(option.id);
-              return (
-                <div
-                  key={option.id}
-                  className="flex items-center space-x-2 p-1 hover:bg-slate-50 rounded cursor-pointer"
-                  onClick={() => handleValueToggle(option.id, option.name)}
-                >
-                  {isMultiSelect ? (
-                    <Checkbox checked={isSelected} />
-                  ) : (
-                    <div className={`w-4 h-4 rounded-full border ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'} flex items-center justify-center`}>
-                      {isSelected && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                  )}
-                  <Badge 
-                    variant="outline" 
-                    className="text-xs"
-                    style={{ backgroundColor: option.color ? `var(--${option.color})` : undefined }}
+            {loading ? (
+              <div className="text-xs text-slate-500">Ładowanie opcji...</div>
+            ) : options.length === 0 ? (
+              <div className="text-xs text-slate-500">Brak opcji</div>
+            ) : (
+              options.map((option) => {
+                const isSelected = selectedValues.includes(option.id);
+                return (
+                  <div
+                    key={option.id}
+                    className="flex items-center space-x-2 p-1 hover:bg-slate-50 rounded cursor-pointer"
+                    onClick={() => handleValueToggle(option.id, option.name)}
                   >
-                    {option.name}
-                  </Badge>
-                </div>
-              );
-            })}
+                    {isMultiSelect ? (
+                      <Checkbox checked={isSelected} />
+                    ) : (
+                      <div className={`w-4 h-4 rounded-full border ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'} flex items-center justify-center`}>
+                        {isSelected && <Check className="h-3 w-3 text-white" />}
+                      </div>
+                    )}
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs"
+                      style={{ backgroundColor: option.color ? `var(--${option.color})` : undefined }}
+                    >
+                      {option.name}
+                    </Badge>
+                  </div>
+                );
+              })
+            )}
           </div>
         </PopoverContent>
       </Popover>
