@@ -47,7 +47,6 @@ export function ChatArea() {
           let selectedDatabaseWithData = {
             id: selectedDatabaseData.id,
             name: selectedDatabaseData.name,
-            description: selectedDatabaseData.description || '',
             pages: [],
             attributes: [],
             selectedAttributeValues: selectedAttributeValues
@@ -87,12 +86,8 @@ export function ChatArea() {
 
       console.log('AI response received:', aiResponse);
 
-      if (aiResponse && aiResponse.response) {
-        await sendMessage(aiResponse.response, 'bot');
-      } else if (aiResponse && aiResponse.content) {
+      if (aiResponse && aiResponse.content) {
         await sendMessage(aiResponse.content, 'bot');
-      } else if (aiResponse && aiResponse.output) {
-        await sendMessage(aiResponse.output, 'bot');
       } else {
         throw new Error('No valid response from AI');
       }

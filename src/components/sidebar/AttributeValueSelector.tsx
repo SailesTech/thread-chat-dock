@@ -84,9 +84,9 @@ export function AttributeValueSelector({
                   onClick={() => handleValueToggle(option.id, option.name)}
                 >
                   {isMultiSelect ? (
-                    <Checkbox checked={isSelected} readOnly />
+                    <Checkbox checked={isSelected} />
                   ) : (
-                    <div className={`w-4 h-4 rounded-full border ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'}`}>
+                    <div className={`w-4 h-4 rounded-full border ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'} flex items-center justify-center`}>
                       {isSelected && <Check className="h-3 w-3 text-white" />}
                     </div>
                   )}

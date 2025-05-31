@@ -282,14 +282,26 @@ async function getAttributes(databaseId: string | null) {
     const data = await response.json();
     console.log(`Found ${Object.keys(data.properties).length} attributes`);
     
-    const attributes = Object.entries(data.properties).map(([name, property]: [string, any]) => ({
-      id: name,
-      name: name,
-      type: property.type,
-      database_id: databaseId
-    }));
+    const attributes = Object.entries(data.properties).map(([name, property]: [string, any]) => {
+      let enrichedAttribute = {
+        id: name,
+        name: name,
+        type: property.type,
+        database_id: databaseId
+      };
 
-    console.log('Processed attributes:', attributes);
+      // Dodaj opcje dla select i multi_select
+      if (property.type === 'select' || property.type === 'multi_select') {
+        enrichedAttribute = {
+          ...enrichedAttribute,
+          options: property[property.type].options || []
+        };
+      }
+
+      return enrichedAttribute;
+    });
+
+    console.log('Processed attributes with options:', attributes);
 
     return new Response(JSON.stringify(attributes), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

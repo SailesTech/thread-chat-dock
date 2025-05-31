@@ -23,7 +23,12 @@ export function MessagesList({ messages, isLoading }: MessagesListProps) {
     <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
       <div className="space-y-6 max-w-4xl mx-auto">
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble 
+            key={message.id} 
+            content={message.content}
+            sender={message.sender}
+            timestamp={message.created_at}
+          />
         ))}
         
         {isLoading && <TypingIndicator />}

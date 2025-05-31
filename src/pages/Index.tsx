@@ -5,6 +5,7 @@ import { ChatArea } from "@/components/ChatArea";
 import { Header } from "@/components/Header";
 import { AuthComponent } from "@/components/AuthComponent";
 import { ChatProvider, useChatContext } from "@/contexts/ChatContext";
+import { NotionSelectionProvider } from "@/contexts/NotionSelectionContext";
 
 function AppContent() {
   const { user, loading } = useChatContext();
@@ -25,17 +26,19 @@ function AppContent() {
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex flex-col w-full bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        <div className="flex flex-1 overflow-hidden">
+    <NotionSelectionProvider>
+      <SidebarProvider defaultOpen={true}>
+        <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
           <AppSidebar />
-          <main className="flex-1 flex flex-col min-w-0">
-            <ChatArea />
-          </main>
+          <div className="flex flex-col flex-1 min-w-0">
+            <Header />
+            <main className="flex-1 flex flex-col overflow-hidden">
+              <ChatArea />
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </NotionSelectionProvider>
   );
 }
 
