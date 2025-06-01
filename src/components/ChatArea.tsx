@@ -133,9 +133,9 @@ export function ChatArea() {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-white to-slate-50">
-      {/* Informacja o wyborze użytkownika */}
+      {/* Sticky pasek z informacją o wyborze użytkownika */}
       {hasSelection && (
-        <div className="px-4 py-2 bg-blue-50 border-b border-blue-200">
+        <div className="sticky top-0 z-10 px-4 py-2 bg-blue-50 border-b border-blue-200 shadow-sm">
           <div className="text-sm text-blue-700">
             🎯 Wybrane: <strong>{getThreadTitle()}</strong>
           </div>
