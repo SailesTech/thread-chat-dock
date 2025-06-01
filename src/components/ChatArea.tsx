@@ -28,11 +28,16 @@ export function ChatArea() {
   const { attributes } = useNotionAttributes(selectedDatabase || null);
 
   const handleSendMessage = async (messageContent: string) => {
-    if (!currentThreadId) return;
+    if (!currentThreadId) {
+      console.error('No current thread ID available');
+      return;
+    }
 
+    console.log('🚀 Starting message send process...');
     setIsLoading(true);
     try {
-      // Send user message
+      // Send user message first
+      console.log('📤 Sending user message:', messageContent);
       await sendMessage(messageContent, 'user');
 
       // Przygotuj kontekst z wybranymi elementami użytkownika
@@ -76,30 +81,49 @@ export function ChatArea() {
         }
       }
 
-      console.log('Sending message with Notion context:', notionContext);
+      console.log('🔄 Sending message to AI with context:', notionContext);
 
+      // Call AI service
       const aiResponse = await apiService.sendChatMessage(
         messageContent, 
         currentThreadId,
         notionContext
       );
 
-      console.log('AI response received:', aiResponse);
+      console.log('✅ AI response received:', aiResponse);
 
       if (aiResponse && aiResponse.content) {
+        console.log('📥 Saving AI response to database:', aiResponse.content);
         await sendMessage(aiResponse.content, 'bot');
+        console.log('✅ AI response saved successfully');
       } else {
-        throw new Error('No valid response from AI');
+        console.error('❌ Invalid AI response structure:', aiResponse);
+        throw new Error('Invalid response from AI service - missing content');
       }
 
     } catch (error) {
-      console.error('Failed to send message:', error);
-      await sendMessage(
-        "Przepraszam, wystąpił błąd podczas przetwarzania Twojego zapytania. Spróbuj ponownie.", 
-        'bot'
-      );
+      console.error('❌ Failed to send message:', error);
+      
+      // More specific error messages
+      let errorMessage = "Przepraszam, wystąpił błąd podczas przetwarzania Twojego zapytania.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Edge function failed')) {
+          errorMessage = "Błąd połączenia z usługą AI. Spróbuj ponownie za chwilę.";
+        } else if (error.message.includes('No content')) {
+          errorMessage = "AI nie zwróciło odpowiedzi. Spróbuj ponownie.";
+        }
+        console.error('Detailed error:', error.message);
+      }
+      
+      try {
+        await sendMessage(errorMessage, 'bot');
+      } catch (dbError) {
+        console.error('Failed to save error message to database:', dbError);
+      }
     } finally {
       setIsLoading(false);
+      console.log('🏁 Message send process completed');
     }
   };
 

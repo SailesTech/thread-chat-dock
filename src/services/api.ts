@@ -1,3 +1,4 @@
+
 // API Service for Notion and Chat integration
 import { supabase } from '@/integrations/supabase/client';
 
@@ -201,6 +202,7 @@ class APIService {
   async sendChatMessage(message: string, threadId?: string, notionContext?: any): Promise<ChatMessage> {
     try {
       console.log(`Sending chat message: ${message}`, threadId ? `to thread ${threadId}` : 'to new thread');
+      console.log('Notion context:', notionContext);
       
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: { 
@@ -210,15 +212,32 @@ class APIService {
         }
       });
 
-      if (error) throw error;
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to get AI response');
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(`Edge function failed: ${error.message}`);
       }
+      
+      console.log("Raw edge function response:", data);
+
+      if (!data) {
+        throw new Error('No response from AI service');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'AI service returned unsuccessful response');
+      }
+
+      // The edge function returns { content: "...", success: true }
+      if (!data.content) {
+        console.error("Missing content in response:", data);
+        throw new Error('No content in AI response');
+      }
+
+      console.log("Successfully extracted AI content:", data.content);
 
       return {
         id: Date.now().toString(),
-        content: data.response,
+        content: data.content,
         sender: "bot",
         timestamp: new Date().toISOString(),
         thread_id: threadId,
