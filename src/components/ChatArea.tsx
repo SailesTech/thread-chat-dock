@@ -35,19 +35,20 @@ export function ChatArea() {
 
     console.log('🚀 Starting message send process...');
     setIsLoading(true);
+    
     try {
       // Send user message first
       console.log('📤 Sending user message:', messageContent);
       await sendMessage(messageContent, 'user');
 
-      // Przygotuj kontekst z wybranymi elementami użytkownika
+      // Prepare context with user's selected elements
       let notionContext = null;
       
       if (hasSelection && selectedDatabase) {
         const selectedDatabaseData = databases.find(db => db.id === selectedDatabase);
         
         if (selectedDatabaseData) {
-          console.log('🎯 Używam wybranej bazy:', selectedDatabaseData.name);
+          console.log('🎯 Using selected database:', selectedDatabaseData.name);
           
           let selectedDatabaseWithData = {
             id: selectedDatabaseData.id,
@@ -57,14 +58,14 @@ export function ChatArea() {
             selectedAttributeValues: selectedAttributeValues
           };
 
-          // Dodaj strony z wybranej bazy
+          // Add pages from selected database
           if (pages && pages.length > 0) {
             selectedDatabaseWithData.pages = selectedPage 
               ? pages.filter(page => page.id === selectedPage)
               : pages;
           }
 
-          // Dodaj wybrane atrybuty
+          // Add selected attributes
           if (attributes && attributes.length > 0) {
             selectedDatabaseWithData.attributes = selectedAttributes.length > 0
               ? attributes.filter(attr => selectedAttributes.includes(attr.id))
@@ -76,14 +77,14 @@ export function ChatArea() {
             selectedPage: selectedPage,
             selectedAttributes: selectedAttributes,
             selectedAttributeValues: selectedAttributeValues,
-            message: `Użytkownik wybrał: ${getThreadTitle()}`
+            message: `User selected: ${getThreadTitle()}`
           };
         }
       }
 
       console.log('🔄 Sending message to AI with context:', notionContext);
 
-      // Call AI service
+      // Call AI service with improved error handling
       const aiResponse = await apiService.sendChatMessage(
         messageContent, 
         currentThreadId,
@@ -92,28 +93,42 @@ export function ChatArea() {
 
       console.log('✅ AI response received:', aiResponse);
 
-      if (aiResponse && aiResponse.content) {
-        console.log('📥 Saving AI response to database:', aiResponse.content);
-        await sendMessage(aiResponse.content, 'bot');
-        console.log('✅ AI response saved successfully');
-      } else {
-        console.error('❌ Invalid AI response structure:', aiResponse);
-        throw new Error('Invalid response from AI service - missing content');
+      // Validate response structure more thoroughly
+      if (!aiResponse) {
+        throw new Error('No response received from AI service');
       }
+
+      if (!aiResponse.content || typeof aiResponse.content !== 'string') {
+        console.error('❌ Invalid AI response structure:', aiResponse);
+        throw new Error('Invalid response format from AI service');
+      }
+
+      if (aiResponse.content.trim() === '') {
+        throw new Error('Empty response from AI service');
+      }
+
+      console.log('📥 Saving AI response to database:', aiResponse.content);
+      await sendMessage(aiResponse.content, 'bot');
+      console.log('✅ AI response saved successfully');
 
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       
-      // More specific error messages
+      // More specific error messages based on error type
       let errorMessage = "Przepraszam, wystąpił błąd podczas przetwarzania Twojego zapytania.";
       
       if (error instanceof Error) {
+        console.error('Detailed error:', error.message);
+        
         if (error.message.includes('Edge function failed')) {
           errorMessage = "Błąd połączenia z usługą AI. Spróbuj ponownie za chwilę.";
-        } else if (error.message.includes('No content')) {
-          errorMessage = "AI nie zwróciło odpowiedzi. Spróbuj ponownie.";
+        } else if (error.message.includes('No content') || error.message.includes('Empty response')) {
+          errorMessage = "AI nie zwróciło odpowiedzi. Spróbuj ponownie lub przeformułuj pytanie.";
+        } else if (error.message.includes('Invalid response')) {
+          errorMessage = "Otrzymano nieprawidłową odpowiedź z AI. Spróbuj ponownie.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Błąd połączenia sieciowego. Sprawdź połączenie i spróbuj ponownie.";
         }
-        console.error('Detailed error:', error.message);
       }
       
       try {
