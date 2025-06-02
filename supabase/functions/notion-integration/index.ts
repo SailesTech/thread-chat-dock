@@ -1,30 +1,19 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  };
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { action, database_id, property_name, filters, data_attributes, page_size } = await req.json();
-    
-    const notionToken = Deno.env.get('NOTION_API_KEY');
-    if (!notionToken) {
-      console.error('NOTION_API_KEY not found');
-      return new Response(
-        JSON.stringify({ error: 'Notion API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const { action, access_token, database_id, filters } = await req.json();
 
     const notionHeaders = {
-      'Authorization': `Bearer ${notionToken}`,
+      'Authorization': `Bearer ${access_token}`,
       'Notion-Version': '2022-06-28',
       'Content-Type': 'application/json',
     };
@@ -38,103 +27,134 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('Querying database with filters:', { database_id, filters, data_attributes });
+      const queryBody: any = {
+        page_size: 100
+      };
 
       // Build Notion filter object
       let notionFilter = {};
       if (filters && filters.length > 0) {
-        console.log('Processing filters:', filters);
-        
+        console.log('=== NOTION FILTER DEBUG START ===');
+        console.log('Raw filters received:', JSON.stringify(filters, null, 2));
+
         const filterConditions = [];
-        
+
         for (const filter of filters) {
-          console.log('Processing filter:', filter);
+          console.log(`\n--- Processing filter for attribute: ${filter.attributeName} ---`);
+          console.log('Filter details:', {
+            attributeName: filter.attributeName,
+            attributeType: filter.attributeType,
+            selectedValues: filter.selectedValues,
+            selectedNames: filter.selectedNames,
+            valuesCount: filter.selectedValues?.length
+          });
           
-          if (!filter.attributeName || !filter.selectedValues || filter.selectedValues.length === 0) {
-            console.warn('Skipping invalid filter:', filter);
+          if (!filter.attributeName) {
+            console.error('❌ Missing attributeName in filter:', filter);
+            continue;
+          }
+          
+          if (!filter.selectedValues || filter.selectedValues.length === 0) {
+            console.warn('⚠️ No selectedValues in filter:', filter);
             continue;
           }
 
-          // Handle different property types
-          if (filter.selectedValues.length === 1) {
-            // Single value filter
-            const value = filter.selectedValues[0];
+          const createFilterCondition = (value: string) => {
+            const property = filter.attributeName;
+            const attributeType = filter.attributeType;
             
-            // Determine filter type based on attribute name and value
-            let filterCondition;
+            console.log(`Creating condition for value: "${value}" with type: "${attributeType}"`);
             
-            // For select/multi_select properties
-            if (filter.attributeType === 'multi_select' || filter.attributeType === 'select') {
-              filterCondition = {
-                property: filter.attributeName,
+            let condition;
+            
+            // Określ prawidłowy operator na podstawie typu właściwości
+            if (attributeType === 'multi_select') {
+              condition = {
+                property,
                 multi_select: {
                   contains: value
                 }
               };
-            } else if (filter.attributeType === 'status') {
-              filterCondition = {
-                property: filter.attributeName,
-                status: {
-                  equals: value
-                }
-              };
-            } else {
-              // Default to select
-              filterCondition = {
-                property: filter.attributeName,
+              console.log('✅ Created multi_select condition');
+            } else if (attributeType === 'select') {
+              condition = {
+                property,
                 select: {
                   equals: value
                 }
               };
+              console.log('✅ Created select condition');
+            } else if (attributeType === 'status') {
+              condition = {
+                property,
+                status: {
+                  equals: value
+                }
+              };
+              console.log('✅ Created status condition');
+            } else {
+              // Domyślnie użyj select
+              console.warn(`⚠️ Unknown attribute type: "${attributeType}", defaulting to select`);
+              condition = {
+                property,
+                select: {
+                  equals: value
+                }
+              };
+              console.log('✅ Created default select condition');
             }
             
+            console.log('Final condition:', JSON.stringify(condition, null, 2));
+            return condition;
+          };
+
+          if (filter.selectedValues.length === 1) {
+            // Pojedyncza wartość
+            console.log('📝 Single value filter');
+            const filterCondition = createFilterCondition(filter.selectedValues[0]);
             filterConditions.push(filterCondition);
+            console.log('Added single condition to filterConditions');
           } else {
-            // Multiple values - use OR condition
-            const orConditions = filter.selectedValues.map((value: string) => {
-              if (filter.attributeType === 'multi_select') {
-                return {
-                  property: filter.attributeName,
-                  multi_select: {
-                    contains: value
-                  }
-                };
-              } else if (filter.attributeType === 'status') {
-                return {
-                  property: filter.attributeName,
-                  status: {
-                    equals: value
-                  }
-                };
-              } else {
-                return {
-                  property: filter.attributeName,
-                  select: {
-                    equals: value
-                  }
-                };
-              }
+            // Wiele wartości - użyj OR condition
+            console.log(`📝 Multiple values filter (${filter.selectedValues.length} values)`);
+            const orConditions = filter.selectedValues.map((value, index) => {
+              console.log(`Processing OR condition ${index + 1}/${filter.selectedValues.length} for value: "${value}"`);
+              return createFilterCondition(value);
             });
             
-            filterConditions.push({
+            const orCondition = {
               or: orConditions
-            });
+            };
+            
+            console.log('Final OR condition:', JSON.stringify(orCondition, null, 2));
+            filterConditions.push(orCondition);
+            console.log('Added OR condition to filterConditions');
           }
+          
+          console.log(`--- Finished processing ${filter.attributeName} ---\n`);
         }
 
+        console.log('\n=== FILTER CONDITIONS SUMMARY ===');
+        console.log('Total filter conditions created:', filterConditions.length);
+        console.log('All filter conditions:', JSON.stringify(filterConditions, null, 2));
+
+        // Build final notion filter
         if (filterConditions.length === 1) {
           notionFilter = filterConditions[0];
+          console.log('🔧 Using single filter condition');
         } else if (filterConditions.length > 1) {
           notionFilter = {
             and: filterConditions
           };
+          console.log('🔧 Using AND combination of multiple filters');
+        } else {
+          console.log('🔧 No filter conditions - querying without filters');
         }
-      }
 
-      // Query the database
-      const queryBody: any = {
-        page_size: page_size || 100
-      };
+        console.log('\n=== FINAL NOTION FILTER ===');
+        console.log('Final notionFilter object:', JSON.stringify(notionFilter, null, 2));
+        console.log('=== NOTION FILTER DEBUG END ===\n');
+      }
 
       if (Object.keys(notionFilter).length > 0) {
         queryBody.filter = notionFilter;
@@ -143,6 +163,15 @@ Deno.serve(async (req) => {
         console.log('Notion query without filters');
       }
 
+      console.log('Notion query body:', JSON.stringify(queryBody, null, 2));
+      
+      // Dodatkowe logowanie przed wysłaniem
+      console.log('=== SENDING TO NOTION API ===');
+      console.log('URL:', `https://api.notion.com/v1/databases/${database_id}/query`);
+      console.log('Method: POST');
+      console.log('Body being sent:', JSON.stringify(queryBody, null, 2));
+      console.log('============================');
+      
       const response = await fetch(`https://api.notion.com/v1/databases/${database_id}/query`, {
         method: 'POST',
         headers: notionHeaders,
@@ -165,76 +194,26 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log('Found', data.results?.length || 0, 'pages');
-
-      // Process pages and filter properties based on data_attributes
-      const pages = data.results?.map((page: any) => {
-        let title = 'Untitled Page';
-        
-        // Extract title
-        if (page.properties) {
-          for (const [key, value] of Object.entries(page.properties)) {
-            if ((value as any).type === 'title' && (value as any).title?.[0]?.plain_text) {
-              title = (value as any).title[0].plain_text;
-              break;
-            }
-          }
-        }
-
-        // Filter properties based on data_attributes
-        let properties = page.properties || {};
-        if (data_attributes && data_attributes.length > 0) {
-          const filteredProperties: any = {};
-          data_attributes.forEach((attrName: string) => {
-            if (properties[attrName]) {
-              filteredProperties[attrName] = properties[attrName];
-            }
-          });
-          properties = filteredProperties;
-        }
-
-        return {
-          id: page.id,
-          title: title,
-          properties: properties,
-          created_time: page.created_time,
-          last_edited_time: page.last_edited_time
-        };
-      }) || [];
-
-      return new Response(
-        JSON.stringify({ 
-          pages,
-          totalCount: pages.length,
-          hasMore: data.has_more || false
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     if (action === 'get_databases') {
-      console.log('Fetching databases from Notion API');
-      
       const response = await fetch('https://api.notion.com/v1/search', {
         method: 'POST',
         headers: notionHeaders,
         body: JSON.stringify({
           filter: {
-            property: 'object',
-            value: 'database'
-          },
-          sort: {
-            direction: 'descending',
-            timestamp: 'last_edited_time'
+            value: 'database',
+            property: 'object'
           }
         })
       });
 
-      console.log('Notion API response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Notion API error:', errorText);
+        console.error('Failed to get databases:', errorText);
         return new Response(
           JSON.stringify({ error: 'Failed to fetch databases from Notion' }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -242,26 +221,12 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log('Notion API success - Found', data.results?.length || 0, 'results');
-
-      const databases = data.results?.map((db: any) => {
-        const title = db.title?.[0]?.plain_text || 'Untitled Database';
-        console.log(`Processing database: ${title} (ID: ${db.id})`);
-        
-        return {
-          id: db.id,
-          name: title,
-          last_edited_time: db.last_edited_time
-        };
-      }) || [];
-
-      return new Response(
-        JSON.stringify({ databases }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    if (action === 'get_pages') {
+    if (action === 'get_database_properties') {
       if (!database_id) {
         return new Response(
           JSON.stringify({ error: 'Database ID is required' }),
@@ -269,7 +234,33 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('Fetching pages for database:', database_id);
+      const response = await fetch(`https://api.notion.com/v1/databases/${database_id}`, {
+        method: 'GET',
+        headers: notionHeaders
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to get database properties:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch database properties from Notion' }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    if (action === 'query_database') {
+      if (!database_id) {
+        return new Response(
+          JSON.stringify({ error: 'Database ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       const response = await fetch(`https://api.notion.com/v1/databases/${database_id}/query`, {
         method: 'POST',
@@ -281,140 +272,179 @@ Deno.serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch pages:', errorText);
+        console.error('Failed to query database:', errorText);
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch pages from Notion' }),
+          JSON.stringify({ error: 'Failed to query database from Notion' }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       const data = await response.json();
-      console.log('Found', data.results?.length || 0, 'pages');
-
-      const pages = data.results?.map((page: any) => {
-        let title = 'Untitled Page';
-        
-        if (page.properties) {
-          for (const [key, value] of Object.entries(page.properties)) {
-            if ((value as any).type === 'title' && (value as any).title?.[0]?.plain_text) {
-              title = (value as any).title[0].plain_text;
-              break;
-            }
-          }
-        }
-
-        return {
-          id: page.id,
-          name: title,
-          created_time: page.created_time,
-          last_edited_time: page.last_edited_time
-        };
-      }) || [];
-
-      return new Response(
-        JSON.stringify({ pages }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    if (action === 'get_attributes') {
-      if (!database_id) {
+    if (action === 'get_page') {
+      const { page_id } = await req.json();
+      
+      if (!page_id) {
         return new Response(
-          JSON.stringify({ error: 'Database ID is required' }),
+          JSON.stringify({ error: 'Page ID is required' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log('Fetching attributes for database:', database_id);
-
-      const response = await fetch(`https://api.notion.com/v1/databases/${database_id}`, {
+      const response = await fetch(`https://api.notion.com/v1/pages/${page_id}`, {
         method: 'GET',
         headers: notionHeaders
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch database schema:', errorText);
+        console.error('Failed to get page:', errorText);
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch database schema from Notion' }),
+          JSON.stringify({ error: 'Failed to fetch page from Notion' }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       const data = await response.json();
-      console.log('Fetched database schema successfully');
-
-      const attributes = Object.entries(data.properties || {}).map(([name, property]: [string, any]) => ({
-        id: property.id || name,
-        name: name,
-        type: property.type
-      }));
-
-      return new Response(
-        JSON.stringify({ attributes }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    if (action === 'get_database_properties') {
-      if (!database_id || !property_name) {
+    if (action === 'create_page') {
+      const { database_id: db_id, properties } = await req.json();
+      
+      if (!db_id || !properties) {
         return new Response(
-          JSON.stringify({ error: 'Database ID and property name are required' }),
+          JSON.stringify({ error: 'Database ID and properties are required' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      console.log(`Fetching property "${property_name}" for database:`, database_id);
+      const response = await fetch('https://api.notion.com/v1/pages', {
+        method: 'POST',
+        headers: notionHeaders,
+        body: JSON.stringify({
+          parent: {
+            database_id: db_id
+          },
+          properties
+        })
+      });
 
-      const response = await fetch(`https://api.notion.com/v1/databases/${database_id}`, {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to create page:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create page in Notion' }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    if (action === 'update_page') {
+      const { page_id, properties } = await req.json();
+      
+      if (!page_id || !properties) {
+        return new Response(
+          JSON.stringify({ error: 'Page ID and properties are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const response = await fetch(`https://api.notion.com/v1/pages/${page_id}`, {
+        method: 'PATCH',
+        headers: notionHeaders,
+        body: JSON.stringify({
+          properties
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to update page:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update page in Notion' }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    if (action === 'delete_page') {
+      const { page_id } = await req.json();
+      
+      if (!page_id) {
+        return new Response(
+          JSON.stringify({ error: 'Page ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const response = await fetch(`https://api.notion.com/v1/pages/${page_id}`, {
+        method: 'PATCH',
+        headers: notionHeaders,
+        body: JSON.stringify({
+          archived: true
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to delete page:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to delete page in Notion' }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    if (action === 'get_page_content') {
+      const { page_id } = await req.json();
+      
+      if (!page_id) {
+        return new Response(
+          JSON.stringify({ error: 'Page ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const response = await fetch(`https://api.notion.com/v1/blocks/${page_id}/children`, {
         method: 'GET',
         headers: notionHeaders
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch database properties:', errorText);
+        console.error('Failed to get page content:', errorText);
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch database properties from Notion' }),
+          JSON.stringify({ error: 'Failed to fetch page content from Notion' }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       const data = await response.json();
-      const property = data.properties?.[property_name];
-
-      if (!property) {
-        return new Response(
-          JSON.stringify({ error: `Property "${property_name}" not found` }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      let propertyData = { type: property.type };
-
-      if (property.type === 'select' && property.select?.options) {
-        propertyData = {
-          ...propertyData,
-          options: property.select.options
-        };
-      } else if (property.type === 'multi_select' && property.multi_select?.options) {
-        propertyData = {
-          ...propertyData,
-          options: property.multi_select.options
-        };
-      } else if (property.type === 'status' && property.status?.options) {
-        propertyData = {
-          ...propertyData,
-          options: property.status.options
-        };
-      }
-
-      console.log(`Property "${property_name}" fetched successfully:`, propertyData);
-
-      return new Response(
-        JSON.stringify({ property: propertyData }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify(data), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     return new Response(
