@@ -1,29 +1,38 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
 
-interface AttributeValue {
-  attributeId: string;
-  attributeName: string;
-  selectedValues: string[];        // ✅ IDs dla n8n query
-  selectedNames?: string[];        // ✅ Nazwy dla AI/display
-}
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { FilteringAttribute, DataAttribute, NotionFilter } from '@/types/notion';
 
 interface NotionSelectionState {
   selectedDatabase: string;
   selectedPage: string;
-  selectedAttributes: string[];
-  selectedAttributeValues: AttributeValue[];
+  filteringAttributes: FilteringAttribute[];
+  dataAttributes: DataAttribute[];
+  filteringAttributeValues: NotionFilter[];
 }
 
 interface NotionSelectionContextType extends NotionSelectionState {
   setSelectedDatabase: (id: string) => void;
   setSelectedPage: (id: string) => void;
-  setSelectedAttributes: (ids: string[]) => void;
-  setSelectedAttributeValues: (values: AttributeValue[]) => void;
-  addAttributeValue: (attributeId: string, attributeName: string, valueId: string, valueName?: string) => void; // ✅ Dodano valueName
-  removeAttributeValue: (attributeId: string, value: string) => void;
+  setFilteringAttributes: (attributes: FilteringAttribute[]) => void;
+  setDataAttributes: (attributes: DataAttribute[]) => void;
+  setFilteringAttributeValues: (values: NotionFilter[]) => void;
+  
+  // Filtering attributes management
+  toggleFilteringAttribute: (attributeId: string, attribute: any) => void;
+  addFilteringAttributeValue: (attributeId: string, attributeName: string, valueId: string, valueName: string) => void;
+  removeFilteringAttributeValue: (attributeId: string, valueId: string) => void;
+  
+  // Data attributes management
+  toggleDataAttribute: (attributeId: string, attribute: any) => void;
+  
+  // Utility functions
   clearSelection: () => void;
   hasSelection: boolean;
+  hasFilters: boolean;
+  hasDataSelection: boolean;
   getThreadTitle: () => string;
+  getFilterSummary: () => string;
+  getDataAttributesSummary: () => string;
 }
 
 const NotionSelectionContext = createContext<NotionSelectionContextType | undefined>(undefined);
@@ -31,60 +40,98 @@ const NotionSelectionContext = createContext<NotionSelectionContextType | undefi
 export function NotionSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedDatabase, setSelectedDatabase] = useState<string>("");
   const [selectedPage, setSelectedPage] = useState<string>("");
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
-  const [selectedAttributeValues, setSelectedAttributeValues] = useState<AttributeValue[]>([]);
+  const [filteringAttributes, setFilteringAttributes] = useState<FilteringAttribute[]>([]);
+  const [dataAttributes, setDataAttributes] = useState<DataAttribute[]>([]);
+  const [filteringAttributeValues, setFilteringAttributeValues] = useState<NotionFilter[]>([]);
 
-  // ✅ Nowa funkcja przyjmująca ID i nazwę
-  const addAttributeValue = (attributeId: string, attributeName: string, valueId: string, valueName?: string) => {
-    setSelectedAttributeValues(prev => {
-      const existing = prev.find(av => av.attributeId === attributeId);
-      
-      if (existing) {
-        // Aktualizuj istniejący atrybut
-        return prev.map(av => 
-          av.attributeId === attributeId
-            ? { 
-                ...av, 
-                selectedValues: [...av.selectedValues, valueId],                    // ✅ Dodaj ID
-                selectedNames: [...(av.selectedNames || []), valueName || valueId]  // ✅ Dodaj nazwę
-              }
-            : av
+  const toggleFilteringAttribute = (attributeId: string, attribute: any) => {
+    setFilteringAttributes(prev => {
+      const exists = prev.find(attr => attr.id === attributeId);
+      if (exists) {
+        // Remove the attribute and its values
+        setFilteringAttributeValues(current => 
+          current.filter(filter => filter.attributeId !== attributeId)
         );
+        return prev.filter(attr => attr.id !== attributeId);
       } else {
-        // Dodaj nowy atrybut
-        return [...prev, { 
-          attributeId, 
-          attributeName, 
-          selectedValues: [valueId],                    // ✅ ID dla n8n
-          selectedNames: [valueName || valueId]        // ✅ Nazwa dla AI
+        // Add the attribute
+        return [...prev, {
+          id: attributeId,
+          name: attribute.name,
+          type: attribute.type,
+          values: []
         }];
       }
     });
   };
 
-  const removeAttributeValue = (attributeId: string, valueId: string) => {
-    setSelectedAttributeValues(prev => 
-      prev.map(av => {
-        if (av.attributeId === attributeId) {
-          const valueIndex = av.selectedValues.indexOf(valueId);
+  const addFilteringAttributeValue = (attributeId: string, attributeName: string, valueId: string, valueName: string) => {
+    setFilteringAttributeValues(prev => {
+      const existing = prev.find(filter => filter.attributeId === attributeId);
+      
+      if (existing) {
+        return prev.map(filter => 
+          filter.attributeId === attributeId
+            ? { 
+                ...filter, 
+                selectedValues: [...filter.selectedValues, valueId],
+                selectedNames: [...filter.selectedNames, valueName]
+              }
+            : filter
+        );
+      } else {
+        return [...prev, { 
+          attributeId, 
+          attributeName, 
+          selectedValues: [valueId],
+          selectedNames: [valueName]
+        }];
+      }
+    });
+  };
+
+  const removeFilteringAttributeValue = (attributeId: string, valueId: string) => {
+    setFilteringAttributeValues(prev => 
+      prev.map(filter => {
+        if (filter.attributeId === attributeId) {
+          const valueIndex = filter.selectedValues.indexOf(valueId);
           return {
-            ...av,
-            selectedValues: av.selectedValues.filter(v => v !== valueId),
-            selectedNames: av.selectedNames 
-              ? av.selectedNames.filter((_, index) => index !== valueIndex)
-              : av.selectedNames
+            ...filter,
+            selectedValues: filter.selectedValues.filter(v => v !== valueId),
+            selectedNames: filter.selectedNames.filter((_, index) => index !== valueIndex)
           };
         }
-        return av;
-      }).filter(av => av.selectedValues.length > 0)
+        return filter;
+      }).filter(filter => filter.selectedValues.length > 0)
     );
+  };
+
+  const toggleDataAttribute = (attributeId: string, attribute: any) => {
+    setDataAttributes(prev => {
+      const exists = prev.find(attr => attr.id === attributeId);
+      if (exists) {
+        return prev.map(attr => 
+          attr.id === attributeId 
+            ? { ...attr, selected: !attr.selected }
+            : attr
+        );
+      } else {
+        return [...prev, {
+          id: attributeId,
+          name: attribute.name,
+          type: attribute.type,
+          selected: true
+        }];
+      }
+    });
   };
 
   const clearSelection = () => {
     setSelectedDatabase("");
     setSelectedPage("");
-    setSelectedAttributes([]);
-    setSelectedAttributeValues([]);
+    setFilteringAttributes([]);
+    setDataAttributes([]);
+    setFilteringAttributeValues([]);
   };
 
   const getThreadTitle = () => {
@@ -94,36 +141,59 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
       parts.push(`DB`);
     }
     
-    if (selectedPage) {
-      parts.push(`Page`);
+    if (hasFilters) {
+      parts.push(`${filteringAttributeValues.length} filters`);
     }
     
-    if (selectedAttributeValues.length > 0) {
-      const attrSummary = selectedAttributeValues
-        .map(av => `${av.attributeName}(${av.selectedValues.length})`)
-        .join(', ');
-      parts.push(attrSummary);
+    if (hasDataSelection) {
+      const selectedCount = dataAttributes.filter(attr => attr.selected).length;
+      parts.push(`${selectedCount} data attrs`);
     }
     
     return parts.length > 0 ? parts.join(' | ') : 'Nowy czat';
   };
 
+  const getFilterSummary = () => {
+    if (filteringAttributeValues.length === 0) return 'Brak filtrów';
+    
+    return filteringAttributeValues
+      .map(filter => `${filter.attributeName}: ${filter.selectedNames.join(', ')}`)
+      .join('; ');
+  };
+
+  const getDataAttributesSummary = () => {
+    const selected = dataAttributes.filter(attr => attr.selected);
+    if (selected.length === 0) return 'Wszystkie atrybuty';
+    
+    return selected.map(attr => attr.name).join(', ');
+  };
+
   const hasSelection = selectedDatabase !== "";
+  const hasFilters = filteringAttributeValues.length > 0;
+  const hasDataSelection = dataAttributes.some(attr => attr.selected);
 
   const value = {
     selectedDatabase,
     selectedPage,
-    selectedAttributes,
-    selectedAttributeValues,
+    filteringAttributes,
+    dataAttributes,
+    filteringAttributeValues,
     setSelectedDatabase,
     setSelectedPage,
-    setSelectedAttributes,
-    setSelectedAttributeValues,
-    addAttributeValue,
-    removeAttributeValue,
+    setFilteringAttributes,
+    setDataAttributes,
+    setFilteringAttributeValues,
+    toggleFilteringAttribute,
+    addFilteringAttributeValue,
+    removeFilteringAttributeValue,
+    toggleDataAttribute,
     clearSelection,
     hasSelection,
+    hasFilters,
+    hasDataSelection,
     getThreadTitle,
+    getFilterSummary,
+    getDataAttributesSummary,
   };
 
   return (

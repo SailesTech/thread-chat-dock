@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useSupabaseChatMessages } from "@/hooks/useSupabaseChatData";
-import { useNotionDatabases, useNotionPages, useNotionAttributes } from "@/hooks/useNotionData";
+import { useNotionDatabases } from "@/hooks/useNotionData";
 import { useNotionSelection } from "@/contexts/NotionSelectionContext";
 import { apiService } from "@/services/api";
 import { MessagesList } from "./chat/MessagesList";
@@ -18,14 +18,15 @@ export function ChatArea() {
   const { 
     selectedDatabase, 
     selectedPage, 
-    selectedAttributes,
-    selectedAttributeValues,
+    filteringAttributeValues,
+    dataAttributes,
     hasSelection,
-    getThreadTitle
+    hasFilters,
+    hasDataSelection,
+    getThreadTitle,
+    getFilterSummary,
+    getDataAttributesSummary
   } = useNotionSelection();
-  
-  const { pages } = useNotionPages(selectedDatabase || null);
-  const { attributes } = useNotionAttributes(selectedDatabase || null);
 
   const handleSendMessage = async (messageContent: string) => {
     if (!currentThreadId) {
@@ -40,43 +41,70 @@ export function ChatArea() {
       console.log('📤 Sending user message:', messageContent);
       await sendMessage(messageContent, 'user');
 
-      // Przygotuj kontekst z wybranymi elementami użytkownika
+      // Prepare context with user selections and filtered data
       let notionContext = null;
       
       if (hasSelection && selectedDatabase) {
         const selectedDatabaseData = databases.find(db => db.id === selectedDatabase);
         
         if (selectedDatabaseData) {
-          console.log('🎯 Używam wybranej bazy:', selectedDatabaseData.name);
+          console.log('🎯 Using selected database:', selectedDatabaseData.name);
           
-          let selectedDatabaseWithData = {
-            id: selectedDatabaseData.id,
-            name: selectedDatabaseData.name,
-            pages: [],
-            attributes: [],
-            selectedAttributeValues: selectedAttributeValues
-          };
-
-          // Dodaj strony z wybranej bazy
-          if (pages && pages.length > 0) {
-            selectedDatabaseWithData.pages = selectedPage 
-              ? pages.filter(page => page.id === selectedPage)
-              : pages;
-          }
-
-          // Dodaj wybrane atrybuty
-          if (attributes && attributes.length > 0) {
-            selectedDatabaseWithData.attributes = selectedAttributes.length > 0
-              ? attributes.filter(attr => selectedAttributes.includes(attr.id))
-              : attributes;
+          let filteredData = null;
+          
+          // Query filtered data if filters are applied
+          if (hasFilters) {
+            try {
+              console.log('🔍 Querying with filters:', filteringAttributeValues);
+              
+              // Get selected data attributes (or all if none selected)
+              const selectedDataAttributes = hasDataSelection 
+                ? dataAttributes.filter(attr => attr.selected).map(attr => attr.name)
+                : []; // Empty array means all attributes
+              
+              const queryResult = await apiService.queryWithFilters({
+                databaseId: selectedDatabase,
+                filters: filteringAttributeValues,
+                dataAttributes: selectedDataAttributes,
+                pageSize: 50
+              });
+              
+              filteredData = queryResult;
+              console.log('✅ Filtered data received:', filteredData.pages.length, 'pages');
+            } catch (error) {
+              console.error('❌ Error querying filtered data:', error);
+              // Continue without filtered data
+            }
           }
 
           notionContext = {
-            selectedDatabase: selectedDatabaseWithData,
+            selectedDatabase: {
+              id: selectedDatabaseData.id,
+              name: selectedDatabaseData.name,
+              hasFilters: hasFilters,
+              hasDataSelection: hasDataSelection,
+              filterSummary: getFilterSummary(),
+              dataAttributesSummary: getDataAttributesSummary(),
+              filteredData: filteredData
+            },
             selectedPage: selectedPage,
-            selectedAttributes: selectedAttributes,
-            selectedAttributeValues: selectedAttributeValues,
-            message: `Użytkownik wybrał: ${getThreadTitle()}`
+            filters: filteringAttributeValues,
+            dataAttributes: hasDataSelection 
+              ? dataAttributes.filter(attr => attr.selected).map(attr => attr.name)
+              : [],
+            summary: {
+              hasSelection: true,
+              hasFilters: hasFilters,
+              hasDataSelection: hasDataSelection,
+              threadTitle: getThreadTitle(),
+              filterDescription: hasFilters 
+                ? `Filtry aktywne: ${getFilterSummary()}`
+                : 'Brak filtrów - używam wszystkich danych',
+              dataDescription: hasDataSelection 
+                ? `Wybrane atrybuty: ${getDataAttributesSummary()}`
+                : 'Wszystkie atrybuty będą uwzględnione',
+              pagesCount: filteredData?.pages?.length || 0
+            }
           };
         }
       }
@@ -104,7 +132,6 @@ export function ChatArea() {
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       
-      // More specific error messages
       let errorMessage = "Przepraszam, wystąpił błąd podczas przetwarzania Twojego zapytania.";
       
       if (error instanceof Error) {
@@ -112,6 +139,8 @@ export function ChatArea() {
           errorMessage = "Błąd połączenia z usługą AI. Spróbuj ponownie za chwilę.";
         } else if (error.message.includes('No content')) {
           errorMessage = "AI nie zwróciło odpowiedzi. Spróbuj ponownie.";
+        } else if (error.message.includes('Failed to query data')) {
+          errorMessage = "Błąd podczas pobierania danych z Notion. Sprawdź filtry i spróbuj ponownie.";
         }
         console.error('Detailed error:', error.message);
       }
@@ -133,11 +162,21 @@ export function ChatArea() {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-white to-slate-50">
-      {/* Informacja o wyborze użytkownika */}
+      {/* Selection and filter info */}
       {hasSelection && (
         <div className="px-4 py-2 bg-blue-50 border-b border-blue-200">
           <div className="text-sm text-blue-700">
-            🎯 Wybrane: <strong>{getThreadTitle()}</strong>
+            🎯 <strong>{getThreadTitle()}</strong>
+            {hasFilters && (
+              <div className="text-xs text-blue-600 mt-1">
+                Filtry: {getFilterSummary()}
+              </div>
+            )}
+            {hasDataSelection && (
+              <div className="text-xs text-blue-600 mt-1">
+                Dane: {getDataAttributesSummary()}
+              </div>
+            )}
           </div>
         </div>
       )}

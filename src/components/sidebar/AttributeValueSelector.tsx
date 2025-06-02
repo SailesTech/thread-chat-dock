@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -18,25 +19,38 @@ interface AttributeValueSelectorProps {
   attributeName: string;
   attributeType: string;
   databaseId: string;
+  mode?: 'filtering' | 'legacy';
 }
 
 export function AttributeValueSelector({ 
   attributeId, 
   attributeName, 
   attributeType,
-  databaseId
+  databaseId,
+  mode = 'legacy'
 }: AttributeValueSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AttributeOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const { selectedAttributeValues, addAttributeValue, removeAttributeValue } = useNotionSelection();
   
-  const currentSelection = selectedAttributeValues.find(av => av.attributeId === attributeId);
+  const { 
+    selectedAttributeValues, 
+    filteringAttributeValues,
+    addAttributeValue, 
+    removeAttributeValue,
+    addFilteringAttributeValue,
+    removeFilteringAttributeValue
+  } = useNotionSelection();
+  
+  // Get current selection based on mode
+  const currentSelection = mode === 'filtering' 
+    ? filteringAttributeValues.find(filter => filter.attributeId === attributeId)
+    : selectedAttributeValues.find(av => av.attributeId === attributeId);
+  
   const selectedValues = currentSelection?.selectedValues || [];
-  
   const isMultiSelect = attributeType === 'multi_select';
 
-  // Pobierz opcje dla tego atrybutu
+  // Fetch options for this attribute
   useEffect(() => {
     const fetchOptions = async () => {
       if (!databaseId || (attributeType !== 'select' && attributeType !== 'multi_select' && attributeType !== 'status')) {
@@ -85,16 +99,30 @@ export function AttributeValueSelector({
   
   const handleValueToggle = (optionId: string, optionName: string) => {
     if (selectedValues.includes(optionId)) {
-      removeAttributeValue(attributeId, optionId);
+      // Remove value
+      if (mode === 'filtering') {
+        removeFilteringAttributeValue(attributeId, optionId);
+      } else {
+        removeAttributeValue(attributeId, optionId);
+      }
     } else {
+      // Add value
       if (!isMultiSelect && attributeType !== 'status') {
         // For single select, clear other values first
         selectedValues.forEach(value => {
-          removeAttributeValue(attributeId, value);
+          if (mode === 'filtering') {
+            removeFilteringAttributeValue(attributeId, value);
+          } else {
+            removeAttributeValue(attributeId, value);
+          }
         });
       }
-      // ✅ POPRAWKA: Dodaj optionName jako 4ty parametr
-      addAttributeValue(attributeId, attributeName, optionId, optionName);
+      
+      if (mode === 'filtering') {
+        addFilteringAttributeValue(attributeId, attributeName, optionId, optionName);
+      } else {
+        addAttributeValue(attributeId, attributeName, optionId, optionName);
+      }
     }
   };
 

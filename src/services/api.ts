@@ -1,6 +1,6 @@
-
 // API Service for Notion and Chat integration
 import { supabase } from '@/integrations/supabase/client';
+import { QueryWithFiltersRequest, QueryWithFiltersResponse } from '@/types/notion';
 
 interface NotionDatabase {
   id: string;
@@ -52,7 +52,6 @@ class APIService {
       if (error) {
         console.error("Supabase function error:", error);
         
-        // Check if it's an authentication error
         if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
           throw new Error('Notion API key is invalid. Please check your Notion integration token.');
         }
@@ -62,7 +61,6 @@ class APIService {
       
       console.log("Notion databases response:", data);
       
-      // Handle different response formats
       if (data && Array.isArray(data.databases)) {
         return data.databases.map((db: any) => ({
           id: db.id,
@@ -77,7 +75,6 @@ class APIService {
     } catch (error) {
       console.error("Error fetching Notion databases:", error);
       
-      // Re-throw with user-friendly message
       if (error instanceof Error) {
         throw error;
       }
@@ -166,6 +163,48 @@ class APIService {
     }
   }
 
+  async queryWithFilters(request: QueryWithFiltersRequest): Promise<QueryWithFiltersResponse> {
+    try {
+      console.log('Querying Notion with filters:', request);
+      
+      const { data, error } = await supabase.functions.invoke('notion-integration', {
+        body: { 
+          action: 'query_with_filters',
+          database_id: request.databaseId,
+          filters: request.filters,
+          data_attributes: request.dataAttributes,
+          page_size: request.pageSize || 100
+        }
+      });
+
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw new Error(`Failed to query data: ${error.message}`);
+      }
+      
+      console.log("Notion query response:", data);
+      
+      if (data && data.pages) {
+        return {
+          pages: data.pages,
+          totalCount: data.totalCount || data.pages.length,
+          hasMore: data.hasMore || false
+        };
+      } else if (data && data.error) {
+        throw new Error(data.error);
+      }
+      
+      return {
+        pages: [],
+        totalCount: 0,
+        hasMore: false
+      };
+    } catch (error) {
+      console.error("Error querying Notion data:", error);
+      throw error;
+    }
+  }
+
   async queryNotionData(query: string, filters?: any): Promise<any[]> {
     try {
       console.log(`Querying Notion data with: ${query}`, filters);
@@ -227,7 +266,6 @@ class APIService {
         throw new Error(data.error || 'AI service returned unsuccessful response');
       }
 
-      // The edge function returns { content: "...", success: true }
       if (!data.content) {
         console.error("Missing content in response:", data);
         throw new Error('No content in AI response');
