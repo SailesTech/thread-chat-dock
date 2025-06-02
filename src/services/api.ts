@@ -247,45 +247,6 @@ class APIService {
       throw error;
     }
   }
-
-  async getChatThreads(): Promise<ChatThread[]> {
-    try {
-      console.log("Fetching chat threads...");
-      // This is handled by the Supabase hooks directly
-      return [];
-    } catch (error) {
-      console.error("Error fetching chat threads:", error);
-      throw error;
-    }
-  }
-
-  async createChatThread(title: string): Promise<ChatThread> {
-    try {
-      console.log(`Creating new chat thread: ${title}`);
-      // This is handled by the Supabase hooks directly
-      return {
-        id: Date.now().toString(),
-        title,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        message_count: 0,
-      };
-    } catch (error) {
-      console.error("Error creating chat thread:", error);
-      throw error;
-    }
-  }
-
-  async getChatMessages(threadId: string): Promise<ChatMessage[]> {
-    try {
-      console.log(`Fetching messages for thread ${threadId}...`);
-      // This is handled by the Supabase hooks directly
-      return [];
-    } catch (error) {
-      console.error("Error fetching chat messages:", error);
-      throw error;
-    }
-  }
 }
 
 export const apiService = new APIService();

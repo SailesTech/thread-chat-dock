@@ -157,6 +157,8 @@ export function useSupabaseChatMessages(threadId: string | null) {
     const fetchMessages = async () => {
       try {
         setLoading(true);
+        console.log('📥 Fetching messages for thread:', threadId);
+        
         const { data, error } = await supabase
           .from('chat_messages')
           .select('*')
@@ -171,17 +173,13 @@ export function useSupabaseChatMessages(threadId: string | null) {
           sender: msg.sender as 'user' | 'bot'
         }));
         
+        console.log('📥 Loaded messages:', typedMessages.length);
         setMessages(typedMessages);
         setError(null);
       } catch (err) {
         const errorMessage = 'Failed to fetch messages';
         setError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        console.error(err);
+        console.error('❌ Error fetching messages:', err);
       } finally {
         setLoading(false);
       }
@@ -189,9 +187,11 @@ export function useSupabaseChatMessages(threadId: string | null) {
 
     fetchMessages();
 
-    // Set up real-time subscription for new messages
+    // Set up real-time subscription for new messages in this specific thread
+    console.log('🔄 Setting up real-time subscription for thread:', threadId);
+    
     const channel = supabase
-      .channel('chat_messages')
+      .channel(`chat_messages_${threadId}`)
       .on(
         'postgres_changes',
         {
@@ -201,16 +201,30 @@ export function useSupabaseChatMessages(threadId: string | null) {
           filter: `thread_id=eq.${threadId}`
         },
         (payload) => {
+          console.log('📨 Real-time message received:', payload.new);
           const newMessage = {
             ...payload.new,
             sender: payload.new.sender as 'user' | 'bot'
           } as ChatMessage;
-          setMessages(prev => [...prev, newMessage]);
+          
+          // Check if message already exists to prevent duplicates
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === newMessage.id);
+            if (exists) {
+              console.log('📨 Message already exists, skipping duplicate');
+              return prev;
+            }
+            console.log('📨 Adding new message to state');
+            return [...prev, newMessage];
+          });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🔄 Subscription status:', status);
+      });
 
     return () => {
+      console.log('🔄 Cleaning up subscription for thread:', threadId);
       supabase.removeChannel(channel);
     };
   }, [threadId, toast]);
@@ -221,6 +235,8 @@ export function useSupabaseChatMessages(threadId: string | null) {
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+
+      console.log('📤 Sending message to database:', { content, sender, threadId });
 
       const { data, error } = await supabase
         .from('chat_messages')
@@ -235,7 +251,11 @@ export function useSupabaseChatMessages(threadId: string | null) {
 
       if (error) throw error;
       
-      // Note: The message will be added automatically via real-time subscription
+      console.log('✅ Message saved to database:', data);
+      
+      // Don't manually add to state here - let the real-time subscription handle it
+      // This prevents duplicate messages
+      
       return data;
     } catch (err) {
       const errorMessage = 'Failed to send message';
@@ -245,7 +265,7 @@ export function useSupabaseChatMessages(threadId: string | null) {
         description: errorMessage,
         variant: "destructive",
       });
-      console.error(err);
+      console.error('❌ Error sending message:', err);
       throw err;
     }
   };
