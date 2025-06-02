@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { FilteringAttribute, DataAttribute, NotionFilter } from '@/types/notion';
 
 interface NotionSelectionState {
@@ -27,6 +27,7 @@ interface NotionSelectionContextType extends NotionSelectionState {
   
   // Utility functions
   clearSelection: () => void;
+  resetFiltersForDatabase: () => void;
   hasSelection: boolean;
   hasFilters: boolean;
   hasDataSelection: boolean;
@@ -43,6 +44,21 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
   const [filteringAttributes, setFilteringAttributes] = useState<FilteringAttribute[]>([]);
   const [dataAttributes, setDataAttributes] = useState<DataAttribute[]>([]);
   const [filteringAttributeValues, setFilteringAttributeValues] = useState<NotionFilter[]>([]);
+
+  // Reset filters when database changes
+  useEffect(() => {
+    if (selectedDatabase) {
+      console.log('Database changed, resetting filters and attributes');
+      resetFiltersForDatabase();
+    }
+  }, [selectedDatabase]);
+
+  const resetFiltersForDatabase = () => {
+    setFilteringAttributes([]);
+    setDataAttributes([]);
+    setFilteringAttributeValues([]);
+    setSelectedPage("");
+  };
 
   const toggleFilteringAttribute = (attributeId: string, attribute: any) => {
     setFilteringAttributes(prev => {
@@ -188,6 +204,7 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
     removeFilteringAttributeValue,
     toggleDataAttribute,
     clearSelection,
+    resetFiltersForDatabase,
     hasSelection,
     hasFilters,
     hasDataSelection,

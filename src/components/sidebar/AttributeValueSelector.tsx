@@ -27,26 +27,20 @@ export function AttributeValueSelector({
   attributeName, 
   attributeType,
   databaseId,
-  mode = 'legacy'
+  mode = 'filtering'
 }: AttributeValueSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AttributeOption[]>([]);
   const [loading, setLoading] = useState(false);
   
   const { 
-    selectedAttributeValues, 
     filteringAttributeValues,
-    addAttributeValue, 
-    removeAttributeValue,
     addFilteringAttributeValue,
     removeFilteringAttributeValue
   } = useNotionSelection();
   
-  // Get current selection based on mode
-  const currentSelection = mode === 'filtering' 
-    ? filteringAttributeValues.find(filter => filter.attributeId === attributeId)
-    : selectedAttributeValues.find(av => av.attributeId === attributeId);
-  
+  // Get current selection for filtering mode
+  const currentSelection = filteringAttributeValues.find(filter => filter.attributeId === attributeId);
   const selectedValues = currentSelection?.selectedValues || [];
   const isMultiSelect = attributeType === 'multi_select';
 
@@ -100,29 +94,17 @@ export function AttributeValueSelector({
   const handleValueToggle = (optionId: string, optionName: string) => {
     if (selectedValues.includes(optionId)) {
       // Remove value
-      if (mode === 'filtering') {
-        removeFilteringAttributeValue(attributeId, optionId);
-      } else {
-        removeAttributeValue(attributeId, optionId);
-      }
+      removeFilteringAttributeValue(attributeId, optionId);
     } else {
       // Add value
       if (!isMultiSelect && attributeType !== 'status') {
         // For single select, clear other values first
         selectedValues.forEach(value => {
-          if (mode === 'filtering') {
-            removeFilteringAttributeValue(attributeId, value);
-          } else {
-            removeAttributeValue(attributeId, value);
-          }
+          removeFilteringAttributeValue(attributeId, value);
         });
       }
       
-      if (mode === 'filtering') {
-        addFilteringAttributeValue(attributeId, attributeName, optionId, optionName);
-      } else {
-        addAttributeValue(attributeId, attributeName, optionId, optionName);
-      }
+      addFilteringAttributeValue(attributeId, attributeName, optionId, optionName);
     }
   };
 

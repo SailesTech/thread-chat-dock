@@ -49,6 +49,8 @@ export function ChatArea() {
         
         if (selectedDatabaseData) {
           console.log('🎯 Using selected database:', selectedDatabaseData.name);
+          console.log('🔍 Current filters:', filteringAttributeValues);
+          console.log('📊 Data attributes:', dataAttributes);
           
           let filteredData = null;
           
@@ -61,6 +63,8 @@ export function ChatArea() {
               const selectedDataAttributes = hasDataSelection 
                 ? dataAttributes.filter(attr => attr.selected).map(attr => attr.name)
                 : []; // Empty array means all attributes
+              
+              console.log('🎯 Selected data attributes for AI:', selectedDataAttributes);
               
               const queryResult = await apiService.queryWithFilters({
                 databaseId: selectedDatabase,
