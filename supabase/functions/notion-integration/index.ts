@@ -10,13 +10,36 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, access_token, database_id, filters } = await req.json();
+    const requestData = await req.json();
+    const { action, access_token, database_id, filters, page_id, properties } = requestData;
+
+    console.log('=== REQUEST DEBUG ===');
+    console.log('Action:', action);
+    console.log('Access token exists:', !!access_token);
+    console.log('Access token length:', access_token?.length || 0);
+    console.log('Access token preview:', access_token ? `${access_token.substring(0, 20)}...` : 'MISSING');
+    console.log('Database ID:', database_id);
+    console.log('====================');
+
+    if (!access_token) {
+      console.error('❌ Missing access_token in request');
+      return new Response(
+        JSON.stringify({ error: 'Access token is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const notionHeaders = {
       'Authorization': `Bearer ${access_token}`,
       'Notion-Version': '2022-06-28',
       'Content-Type': 'application/json',
     };
+
+    console.log('Notion headers prepared:', {
+      'Authorization': `Bearer ${access_token.substring(0, 20)}...`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    });
 
     if (action === 'query_with_filters') {
       if (!database_id) {
@@ -200,27 +223,53 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'get_databases') {
+      console.log('🔍 Getting databases from Notion...');
+      
+      const requestBody = {
+        filter: {
+          value: 'database',
+          property: 'object'
+        }
+      };
+      
+      console.log('Request to Notion API:');
+      console.log('URL: https://api.notion.com/v1/search');
+      console.log('Method: POST');
+      console.log('Headers:', notionHeaders);
+      console.log('Body:', JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch('https://api.notion.com/v1/search', {
         method: 'POST',
         headers: notionHeaders,
-        body: JSON.stringify({
-          filter: {
-            value: 'database',
-            property: 'object'
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
+
+      console.log('Notion API response status:', response.status);
+      console.log('Notion API response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to get databases:', errorText);
+        console.error('❌ Failed to get databases from Notion:');
+        console.error('Status:', response.status);
+        console.error('Status text:', response.statusText);
+        console.error('Error body:', errorText);
+        console.error('Request headers sent:', notionHeaders);
+        
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch databases from Notion' }),
+          JSON.stringify({ 
+            error: 'Failed to fetch databases from Notion',
+            status: response.status,
+            statusText: response.statusText,
+            details: errorText
+          }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       const data = await response.json();
+      console.log('✅ Successfully got databases from Notion');
+      console.log('Number of databases found:', data.results?.length || 0);
+      
       return new Response(JSON.stringify(data), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
@@ -286,8 +335,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'get_page') {
-      const { page_id } = await req.json();
-      
       if (!page_id) {
         return new Response(
           JSON.stringify({ error: 'Page ID is required' }),
@@ -316,7 +363,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create_page') {
-      const { database_id: db_id, properties } = await req.json();
+      const { database_id: db_id } = requestData;
       
       if (!db_id || !properties) {
         return new Response(
@@ -352,8 +399,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'update_page') {
-      const { page_id, properties } = await req.json();
-      
       if (!page_id || !properties) {
         return new Response(
           JSON.stringify({ error: 'Page ID and properties are required' }),
@@ -385,8 +430,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'delete_page') {
-      const { page_id } = await req.json();
-      
       if (!page_id) {
         return new Response(
           JSON.stringify({ error: 'Page ID is required' }),
@@ -418,8 +461,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'get_page_content') {
-      const { page_id } = await req.json();
-      
       if (!page_id) {
         return new Response(
           JSON.stringify({ error: 'Page ID is required' }),
