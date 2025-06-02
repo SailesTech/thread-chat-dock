@@ -92,6 +92,8 @@ export function AttributeValueSelector({
   }, [databaseId, attributeName, attributeType]);
   
   const handleValueToggle = (optionId: string, optionName: string) => {
+    console.log(`Toggling value: ${optionName} (${optionId}) for attribute ${attributeName} (${attributeType})`);
+    
     if (selectedValues.includes(optionId)) {
       // Remove value
       removeFilteringAttributeValue(attributeId, optionId);
@@ -104,7 +106,8 @@ export function AttributeValueSelector({
         });
       }
       
-      addFilteringAttributeValue(attributeId, attributeName, optionId, optionName);
+      // Store the attribute type when adding the filter
+      addFilteringAttributeValue(attributeId, attributeName, optionId, optionName, attributeType);
     }
   };
 

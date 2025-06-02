@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
 
     if (action === 'query_with_filters') {
       if (!database_id) {
+        console.error('Database ID is required for query_with_filters');
         return new Response(
           JSON.stringify({ error: 'Database ID is required' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -42,29 +43,84 @@ Deno.serve(async (req) => {
       // Build Notion filter object
       let notionFilter = {};
       if (filters && filters.length > 0) {
-        const filterConditions = filters.map((filter: any) => {
-          const condition: any = {
-            property: filter.attributeName,
-          };
-
-          // Handle different filter types
-          if (filter.selectedValues.length === 1) {
-            // Single value
-            condition[filter.attributeType || 'select'] = {
-              equals: filter.selectedValues[0]
-            };
-          } else if (filter.selectedValues.length > 1) {
-            // Multiple values - use OR condition
-            condition.or = filter.selectedValues.map((value: string) => ({
-              property: filter.attributeName,
-              [filter.attributeType || 'select']: {
-                equals: value
-              }
-            }));
+        console.log('Processing filters:', filters);
+        
+        const filterConditions = [];
+        
+        for (const filter of filters) {
+          console.log('Processing filter:', filter);
+          
+          if (!filter.attributeName || !filter.selectedValues || filter.selectedValues.length === 0) {
+            console.warn('Skipping invalid filter:', filter);
+            continue;
           }
 
-          return condition;
-        });
+          // Handle different property types
+          if (filter.selectedValues.length === 1) {
+            // Single value filter
+            const value = filter.selectedValues[0];
+            
+            // Determine filter type based on attribute name and value
+            let filterCondition;
+            
+            // For select/multi_select properties
+            if (filter.attributeType === 'multi_select' || filter.attributeType === 'select') {
+              filterCondition = {
+                property: filter.attributeName,
+                multi_select: {
+                  contains: value
+                }
+              };
+            } else if (filter.attributeType === 'status') {
+              filterCondition = {
+                property: filter.attributeName,
+                status: {
+                  equals: value
+                }
+              };
+            } else {
+              // Default to select
+              filterCondition = {
+                property: filter.attributeName,
+                select: {
+                  equals: value
+                }
+              };
+            }
+            
+            filterConditions.push(filterCondition);
+          } else {
+            // Multiple values - use OR condition
+            const orConditions = filter.selectedValues.map((value: string) => {
+              if (filter.attributeType === 'multi_select') {
+                return {
+                  property: filter.attributeName,
+                  multi_select: {
+                    contains: value
+                  }
+                };
+              } else if (filter.attributeType === 'status') {
+                return {
+                  property: filter.attributeName,
+                  status: {
+                    equals: value
+                  }
+                };
+              } else {
+                return {
+                  property: filter.attributeName,
+                  select: {
+                    equals: value
+                  }
+                };
+              }
+            });
+            
+            filterConditions.push({
+              or: orConditions
+            });
+          }
+        }
 
         if (filterConditions.length === 1) {
           notionFilter = filterConditions[0];
@@ -82,9 +138,10 @@ Deno.serve(async (req) => {
 
       if (Object.keys(notionFilter).length > 0) {
         queryBody.filter = notionFilter;
+        console.log('Notion query with filter:', JSON.stringify(queryBody, null, 2));
+      } else {
+        console.log('Notion query without filters');
       }
-
-      console.log('Notion query body:', JSON.stringify(queryBody, null, 2));
 
       const response = await fetch(`https://api.notion.com/v1/databases/${database_id}/query`, {
         method: 'POST',
@@ -95,8 +152,14 @@ Deno.serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to query database:', errorText);
+        console.error('Response status:', response.status);
+        console.error('Query body was:', JSON.stringify(queryBody, null, 2));
         return new Response(
-          JSON.stringify({ error: 'Failed to query database from Notion' }),
+          JSON.stringify({ 
+            error: 'Failed to query database from Notion',
+            details: errorText,
+            status: response.status
+          }),
           { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -362,7 +425,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Edge function error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

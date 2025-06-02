@@ -19,7 +19,7 @@ interface NotionSelectionContextType extends NotionSelectionState {
   
   // Filtering attributes management
   toggleFilteringAttribute: (attributeId: string, attribute: any) => void;
-  addFilteringAttributeValue: (attributeId: string, attributeName: string, valueId: string, valueName: string) => void;
+  addFilteringAttributeValue: (attributeId: string, attributeName: string, valueId: string, valueName: string, attributeType?: string) => void;
   removeFilteringAttributeValue: (attributeId: string, valueId: string) => void;
   
   // Data attributes management
@@ -81,7 +81,9 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const addFilteringAttributeValue = (attributeId: string, attributeName: string, valueId: string, valueName: string) => {
+  const addFilteringAttributeValue = (attributeId: string, attributeName: string, valueId: string, valueName: string, attributeType?: string) => {
+    console.log(`Adding filter value: ${valueName} (${valueId}) for ${attributeName} (${attributeType})`);
+    
     setFilteringAttributeValues(prev => {
       const existing = prev.find(filter => filter.attributeId === attributeId);
       
@@ -91,7 +93,8 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
             ? { 
                 ...filter, 
                 selectedValues: [...filter.selectedValues, valueId],
-                selectedNames: [...filter.selectedNames, valueName]
+                selectedNames: [...filter.selectedNames, valueName],
+                attributeType: attributeType || filter.attributeType
               }
             : filter
         );
@@ -100,7 +103,8 @@ export function NotionSelectionProvider({ children }: { children: ReactNode }) {
           attributeId, 
           attributeName, 
           selectedValues: [valueId],
-          selectedNames: [valueName]
+          selectedNames: [valueName],
+          attributeType: attributeType
         }];
       }
     });

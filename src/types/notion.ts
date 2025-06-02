@@ -24,6 +24,7 @@ export interface NotionFilter {
   attributeName: string;
   selectedValues: string[];
   selectedNames: string[];
+  attributeType?: string;
 }
 
 export interface FilteredPage {
